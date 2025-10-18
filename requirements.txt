@@ -1,8 +1,6 @@
 # ComfyUI Model Preset Pilot Requirements
-# Add your project dependencies here
+# Dependencies for the Model Preset Pilot module
 
-# Example dependencies (uncomment and modify as needed):
-# torch>=1.9.0
-# torchvision>=0.10.0
-# numpy>=1.21.0
-# pillow>=8.3.0
+torch>=1.9.0
+pillow>=8.3.0
+numpy>=1.21.0
