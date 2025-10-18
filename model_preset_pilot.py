@@ -11,13 +11,15 @@
 import os
 import json
 import hashlib
-from typing import Any, Dict, Optional
+import shutil
+from typing import Any, Dict, Optional, List, Tuple
 
 import torch
 from PIL import Image
 
 import comfy.utils
 import nodes
+import folder_paths
 
 # Try to read available samplers/schedulers from Comfy's KSampler;
 # fall back to a safe list if the attributes aren't exposed.
@@ -71,6 +73,31 @@ def _preset_path(model_id: str) -> str:
 def _preview_path(model_id: str) -> str:
     return os.path.join(PREVIEW_DIR, f"{model_id}.png")
 
+def _get_preview_info(model_id: str) -> Dict[str, Any]:
+    """Get information about the preview image for a model"""
+    preview_file = _preview_path(model_id)
+    info = {
+        "exists": False,
+        "path": preview_file,
+        "size": None,
+        "dimensions": None,
+        "last_modified": None,
+    }
+    
+    if os.path.exists(preview_file):
+        info["exists"] = True
+        stat = os.stat(preview_file)
+        info["size"] = stat.st_size
+        info["last_modified"] = stat.st_mtime
+        
+        try:
+            with Image.open(preview_file) as img:
+                info["dimensions"] = img.size
+        except Exception:
+            pass
+            
+    return info
+
 
 def _load_preset(model_id: str) -> Dict[str, Any]:
     path = _preset_path(model_id)
@@ -117,6 +144,58 @@ class ModelPresetPilot:
       • save:   overwrite preset with current inputs, optional preview generation
       • update: partial update of existing preset
     """
+    
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        return float("NaN")  # Always update to handle button clicks
+    
+    @classmethod
+    def VALIDATE_INPUTS(cls, **kwargs):
+        return True
+        
+    @classmethod
+    def get_js(cls):
+        # Add custom JavaScript to enhance the UI
+        js = """
+        // Add custom JavaScript for the Model Preset Pilot node
+        function setupModelPresetPilotUI(node) {
+            const loadImageCheckbox = node.widgets.filter(w => w.name === "load_image")[0];
+            if (!loadImageCheckbox) return;
+            
+            // Create info display element
+            const infoDiv = document.createElement("div");
+            infoDiv.className = "model-preset-info";
+            infoDiv.style.margin = "10px 0";
+            infoDiv.style.padding = "8px";
+            infoDiv.style.backgroundColor = "rgba(0,0,0,0.1)";
+            infoDiv.style.borderRadius = "4px";
+            infoDiv.style.fontSize = "12px";
+            infoDiv.innerHTML = "<b>Preview Image:</b> No information available";
+            
+            // Add it after the checkbox
+            const widgetContainer = loadImageCheckbox.options.el.parentElement.parentElement;
+            widgetContainer.parentElement.insertBefore(infoDiv, widgetContainer.nextSibling);
+            
+            // Update info when model changes
+            const modelInput = node.inputs ? node.inputs.find(i => i.name === "model") : null;
+            if (modelInput && modelInput.link) {
+                // TODO: Add code to update preview info when model changes
+                infoDiv.innerHTML = "<b>Preview Image:</b> Connect model to see info";
+            }
+        }
+        
+        // Register a callback when nodes are added to the graph
+        app.registerExtension({
+            name: "ModelPresetPilot.UI",
+            async nodeCreated(node) {
+                if (node.comfyClass === "ModelPresetPilot") {
+                    // Wait for widgets to be created
+                    setTimeout(() => setupModelPresetPilotUI(node), 100);
+                }
+            }
+        });
+        """
+        return js
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -150,7 +229,15 @@ class ModelPresetPilot:
                 # Preview generation control
                 "generate_preview": ("BOOLEAN", {"default": False}),
                 "overwrite_preview": ("BOOLEAN", {"default": False}),
+                
+                # Manual image loading
+                "load_image": ("BOOLEAN", {"default": False}),
+                "image": ("IMAGE", ),
             },
+            "hidden": {
+                "unique_id": "UNIQUE_ID",
+                "extra_pnginfo": "EXTRA_PNGINFO",
+            }
         }
 
     RETURN_TYPES = (
@@ -190,11 +277,27 @@ class ModelPresetPilot:
     def _empty_image(self):
         return torch.zeros((1, 1, 1, 3), dtype=torch.float32)
 
+    def _save_image_as_preview(self, image_tensor: torch.Tensor, preview_file: str) -> None:
+        """Save the given image tensor as a preview image"""
+        os.makedirs(os.path.dirname(preview_file), exist_ok=True)
+        
+        # Create a backup of the original image if it exists
+        if os.path.exists(preview_file):
+            backup_file = f"{preview_file}.bak"
+            try:
+                shutil.copy2(preview_file, backup_file)
+            except Exception as e:
+                print(f"Warning: Could not create backup of preview image: {e}")
+                
+        # Save the new preview image
+        _image_tensor_to_pil(image_tensor).save(preview_file)
+        
     def run(self, mode, model=None, ckpt_name="", positive_cond=None, negative_cond=None,
             clip=None, positive="a photo of a subject", negative="", vae=None,
             sampler_name=SAMPLER_CHOICES[0], scheduler=SCHEDULER_CHOICES[0],
             steps=28, cfg=5.5, clip_skip=0, width=1024, height=1024, seed=0,
-            generate_preview=False, overwrite_preview=False):
+            generate_preview=False, overwrite_preview=False, load_image=False, image=None,
+            unique_id=None, extra_pnginfo=None):
 
         model_id = _model_identifier(model, ckpt_name)
         preset = _load_preset(model_id)
@@ -224,24 +327,42 @@ class ModelPresetPilot:
 
         preview_file = _preview_path(model_id)
         preview_tensor = None
-        need_gen = generate_preview and (overwrite_preview or not os.path.exists(preview_file))
-        can_gen = (model and vae) and (
-            (positive_cond is not None and negative_cond is not None) or (clip and isinstance(positive, str))
-        )
+        
+        # Handle manual image loading
+        if load_image and image is not None and image.shape[0] > 0:
+            # Save the provided image as the preview for this model
+            self._save_image_as_preview(image, preview_file)
+            preview_tensor = image
+            
+            # Get and display preview info
+            preview_info = _get_preview_info(model_id)
+            dimensions = preview_info.get("dimensions", "unknown")
+            print(f"✅ Saved manually loaded image as preview for model: {model_id}")
+            print(f"   - Dimensions: {dimensions}")
+            print(f"   - Path: {preview_info['path']}")
+        else:
+            # Standard preview generation logic
+            need_gen = generate_preview and (overwrite_preview or not os.path.exists(preview_file))
+            can_gen = (model and vae) and (
+                (positive_cond is not None and negative_cond is not None) or (clip and isinstance(positive, str))
+            )
 
-        if need_gen and can_gen:
-            if positive_cond is None or negative_cond is None:
-                positive_cond, negative_cond = self._encode_if_needed(clip, positive, negative)
-            img = self._generate_preview(model, vae, positive_cond, negative_cond,
-                                         width, height, seed, steps, cfg, sampler_name, scheduler)
-            _image_tensor_to_pil(img).save(preview_file)
-            preview_tensor = img
+            if need_gen and can_gen:
+                if positive_cond is None or negative_cond is None:
+                    positive_cond, negative_cond = self._encode_if_needed(clip, positive, negative)
+                img = self._generate_preview(model, vae, positive_cond, negative_cond,
+                                            width, height, seed, steps, cfg, sampler_name, scheduler)
+                self._save_image_as_preview(img, preview_file)
+                preview_tensor = img
 
+        # Load existing preview if we don't have one yet
         if preview_tensor is None and os.path.exists(preview_file):
             try:
                 preview_tensor = _pil_to_image_tensor(Image.open(preview_file).convert("RGB"))
             except Exception:
                 preview_tensor = None
+                
+        # Fallback to empty image if needed
         if preview_tensor is None:
             preview_tensor = self._empty_image()
 
@@ -251,5 +372,25 @@ class ModelPresetPilot:
         )
 
 
-NODE_CLASS_MAPPINGS = {"ModelPresetPilot": ModelPresetPilot}
-NODE_DISPLAY_NAME_MAPPINGS = {"ModelPresetPilot": "🧭 Model Preset Pilot"}
+# Add a custom UI component for the load image button
+class ModelPresetPilotWidget:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"node_id": ("STRING", {"multiline": False})}}
+    
+    RETURN_TYPES = ()
+    FUNCTION = "load_image"
+    OUTPUT_NODE = True
+    CATEGORY = "Custom/Model Presets"
+
+    def load_image(self, node_id):
+        return {}
+
+NODE_CLASS_MAPPINGS = {
+    "ModelPresetPilot": ModelPresetPilot,
+    "ModelPresetPilotWidget": ModelPresetPilotWidget
+}
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "ModelPresetPilot": "🧭 Model Preset Pilot",
+    "ModelPresetPilotWidget": "🖼️ Load Model Preview Image"
+}

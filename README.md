@@ -20,6 +20,7 @@ A ComfyUI custom node module for managing model presets and configurations. This
 - **Automatic Model Preset Management**: Load, save, and update presets for each model
 - **Preset Parameters**: sampler, scheduler, steps, CFG, clip-skip, seed, resolution
 - **Preview Generation**: Create and cache standardized preview images for each model
+- **Manual Preview Loading**: Easily load custom images as model previews
 - **Multiple Operation Modes**: Load, Save, Update
 - **Flexible Input Options**: Works with both direct conditioning or CLIP+text
 
@@ -40,12 +41,24 @@ A ComfyUI custom node module for managing model presets and configurations. This
 
 ### Preview Generation
 
-To generate a preview image:
+#### Automatic Preview Generation
+To generate a preview image automatically:
 1. Connect VAE and either:
    - CLIP + positive/negative prompts, or
    - Positive/negative conditioning
 2. Set "generate_preview" to True
 3. Optionally set "overwrite_preview" to True to regenerate existing previews
+
+#### Manual Preview Loading
+To manually load an image as a model preview:
+1. Connect an image to the "image" input
+2. Set "load_image" to True
+3. Run the node to save the image as the model's preview
+
+The manually loaded image will be:
+- Copied to the model's preview directory
+- Displayed whenever the model is loaded
+- Backed up if it already exists (as .png.bak)
 
 ### File Storage
 
