@@ -213,45 +213,72 @@ class ModelPresetLoader:
         js = """
         // Add custom JavaScript for the Model Preset Loader node
         function setupModelPresetLoaderUI(node) {
-            // Create image preview canvas
-            const previewCanvas = document.createElement("canvas");
-            previewCanvas.width = 200;
-            previewCanvas.height = 200;
-            previewCanvas.style.border = "2px solid #333";
-            previewCanvas.style.borderRadius = "8px";
-            previewCanvas.style.margin = "10px 0";
-            previewCanvas.style.backgroundColor = "#1a1a1a";
-            previewCanvas.style.display = "block";
-            
-            // Create text display area
+            // Create text display area (positioned at top)
             const textDisplay = document.createElement("div");
             textDisplay.className = "model-info-display";
-            textDisplay.style.margin = "10px 0";
+            textDisplay.style.position = "absolute";
+            textDisplay.style.top = "60px";
+            textDisplay.style.left = "10px";
+            textDisplay.style.right = "10px";
+            textDisplay.style.height = "80px";
             textDisplay.style.padding = "8px";
-            textDisplay.style.backgroundColor = "rgba(0,0,0,0.3)";
+            textDisplay.style.backgroundColor = "rgba(0,0,0,0.7)";
             textDisplay.style.borderRadius = "4px";
-            textDisplay.style.fontSize = "12px";
+            textDisplay.style.fontSize = "11px";
             textDisplay.style.fontFamily = "monospace";
             textDisplay.style.color = "#ccc";
             textDisplay.style.border = "1px solid #444";
+            textDisplay.style.overflow = "hidden";
+            textDisplay.style.display = "flex";
+            textDisplay.style.alignItems = "center";
+            textDisplay.style.justifyContent = "center";
             textDisplay.innerHTML = "Model: Not connected<br>ID: Unknown";
+            
+            // Create image preview canvas (positioned at bottom)
+            const previewCanvas = document.createElement("canvas");
+            previewCanvas.width = 150;
+            previewCanvas.height = 150;
+            previewCanvas.style.position = "absolute";
+            previewCanvas.style.bottom = "10px";
+            previewCanvas.style.left = "10px";
+            previewCanvas.style.right = "10px";
+            previewCanvas.style.border = "2px solid #333";
+            previewCanvas.style.borderRadius = "8px";
+            previewCanvas.style.backgroundColor = "#1a1a1a";
+            previewCanvas.style.display = "block";
+            previewCanvas.style.margin = "0 auto";
             
             // Add elements to the node
             const nodeContainer = node.widgets[0].options.el.parentElement.parentElement;
-            nodeContainer.appendChild(previewCanvas);
+            nodeContainer.style.position = "relative";
+            nodeContainer.style.minHeight = "300px";
             nodeContainer.appendChild(textDisplay);
+            nodeContainer.appendChild(previewCanvas);
             
-            // Function to update the display
+            // Function to update the display with default preview
             function updateDisplay() {
-                // This would be called when the node executes
-                // For now, just show placeholder
                 const ctx = previewCanvas.getContext("2d");
-                ctx.fillStyle = "#333";
-                ctx.fillRect(0, 0, 200, 200);
+                
+                // Create a default preview image with gradient background
+                const gradient = ctx.createLinearGradient(0, 0, 150, 150);
+                gradient.addColorStop(0, "#2a2a2a");
+                gradient.addColorStop(1, "#1a1a1a");
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 150, 150);
+                
+                // Add border
+                ctx.strokeStyle = "#444";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(1, 1, 148, 148);
+                
+                // Add default preview icon
                 ctx.fillStyle = "#666";
-                ctx.font = "12px Arial";
+                ctx.font = "bold 14px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText("Preview", 100, 100);
+                ctx.fillText("🖼️", 75, 70);
+                ctx.font = "10px Arial";
+                ctx.fillText("Preview", 75, 90);
+                ctx.fillText("Image", 75, 105);
             }
             
             // Initialize display
@@ -299,6 +326,38 @@ class ModelPresetLoader:
 
     def _empty_image(self):
         return torch.zeros((1, 1, 1, 3), dtype=torch.float32)
+    
+    def _create_default_preview(self, width=150, height=150):
+        """Create a default preview image with a nice gradient and icon"""
+        # Create a gradient background
+        img = Image.new('RGB', (width, height), '#1a1a1a')
+        
+        # Create a simple default preview with text
+        from PIL import ImageDraw, ImageFont
+        draw = ImageDraw.Draw(img)
+        
+        # Add gradient effect
+        for y in range(height):
+            alpha = int(255 * (1 - y / height))
+            color = (int(26 + alpha * 0.1), int(26 + alpha * 0.1), int(26 + alpha * 0.1))
+            draw.line([(0, y), (width, y)], fill=color)
+        
+        # Add border
+        draw.rectangle([0, 0, width-1, height-1], outline='#444', width=2)
+        
+        # Add preview text
+        try:
+            # Try to use a default font
+            font = ImageFont.load_default()
+        except:
+            font = None
+            
+        # Add icon and text
+        draw.text((width//2, height//2 - 20), "🖼️", font=font, anchor="mm", fill="#666")
+        draw.text((width//2, height//2 + 10), "Preview", font=font, anchor="mm", fill="#666")
+        draw.text((width//2, height//2 + 25), "Image", font=font, anchor="mm", fill="#666")
+        
+        return _pil_to_image_tensor(img)
 
     def _save_image_as_preview(self, image_tensor: torch.Tensor, preview_file: str) -> None:
         """Save the given image tensor as a preview image"""
@@ -338,8 +397,8 @@ class ModelPresetLoader:
                 except Exception:
                     preview_tensor = None
             
-            # Fallback to empty image if no preview available
+            # Fallback to default preview image if no preview available
             if preview_tensor is None:
-                preview_tensor = self._empty_image()
+                preview_tensor = self._create_default_preview()
 
         return (model, preview_tensor, model_info)
