@@ -10,9 +10,16 @@ data/
 │   ├── index.json      # Model registry
 │   └── models/         # Individual model presets
 │       └── model_name/
-│           ├── presets.json
 │           ├── metadata.json
-│           └── previews/
+│           ├── realistic/       # Individual preset folder
+│           │   ├── preset.json
+│           │   └── preview.png
+│           ├── anime/          # Another preset folder
+│           │   ├── preset.json
+│           │   └── preview.png
+│           └── portrait/       # Another preset folder
+│               ├── preset.json
+│               └── preview.png
 ├── defaults/           # Default configuration files
 │   ├── preset_templates.json    # Default preset templates
 │   └── storage_schema.json     # Storage schema definition

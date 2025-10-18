@@ -49,14 +49,19 @@ def _get_model_directory(model_id: str) -> str:
     return os.path.join(MODELS_DIR, model_id)
 
 
-def _get_model_presets_file(model_id: str) -> str:
-    """Get the presets file path for a specific model"""
-    return os.path.join(_get_model_directory(model_id), "presets.json")
+def _get_preset_directory(model_id: str, preset_id: str) -> str:
+    """Get the directory path for a specific preset"""
+    return os.path.join(_get_model_directory(model_id), preset_id)
 
 
-def _get_model_previews_dir(model_id: str) -> str:
-    """Get the previews directory for a specific model"""
-    return os.path.join(_get_model_directory(model_id), "previews")
+def _get_preset_file(model_id: str, preset_id: str) -> str:
+    """Get the preset file path for a specific preset"""
+    return os.path.join(_get_preset_directory(model_id, preset_id), "preset.json")
+
+
+def _get_preset_preview_file(model_id: str, preset_id: str) -> str:
+    """Get the preview file path for a specific preset"""
+    return os.path.join(_get_preset_directory(model_id, preset_id), "preview.png")
 
 
 def _get_model_metadata_file(model_id: str) -> str:
@@ -135,17 +140,18 @@ def _save_model_metadata(model_id: str, metadata: Dict[str, Any]) -> None:
 
 def create_preset(model_id: str, preset_data: Dict[str, Any], preset_name: str = None) -> str:
     """Create a new preset for a model"""
-    # Load existing presets
-    presets_data = _load_model_presets(model_id)
-    
     # Generate preset ID
-    preset_id = preset_name or f"preset_{len(presets_data.get('presets', {})) + 1}"
+    preset_id = preset_name or f"preset_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     preset_id = _sanitize_filename(preset_id)
+    
+    # Create preset directory
+    preset_dir = _get_preset_directory(model_id, preset_id)
+    os.makedirs(preset_dir, exist_ok=True)
     
     # Create preset entry
     preset_entry = {
         "id": preset_id,
-        "name": preset_name or f"Preset {len(presets_data.get('presets', {})) + 1}",
+        "name": preset_name or f"Preset {preset_id}",
         "description": preset_data.get("description", ""),
         "sampler_name": preset_data.get("sampler_name", "none"),
         "scheduler": preset_data.get("scheduler", "none"),
@@ -157,25 +163,17 @@ def create_preset(model_id: str, preset_data: Dict[str, Any], preset_name: str =
         "seed": preset_data.get("seed", 0),
         "created_at": datetime.now().isoformat(),
         "updated_at": datetime.now().isoformat(),
-        "preview_image": f"{preset_id}.png",
         "tags": preset_data.get("tags", [])
     }
     
-    # Add to presets
-    if "presets" not in presets_data:
-        presets_data["presets"] = {}
-    presets_data["presets"][preset_id] = preset_entry
-    
-    # Set as default if it's the first preset
-    if not presets_data.get("default_preset"):
-        presets_data["default_preset"] = preset_id
-    
-    # Save presets
-    _save_model_presets(model_id, presets_data)
+    # Save individual preset file
+    preset_file = _get_preset_file(model_id, preset_id)
+    with open(preset_file, "w", encoding="utf-8") as f:
+        json.dump(preset_entry, f, ensure_ascii=False, indent=2)
     
     # Update model metadata
     metadata = _load_model_metadata(model_id)
-    metadata["preset_count"] = len(presets_data["presets"])
+    metadata["preset_count"] = len([d for d in os.listdir(_get_model_directory(model_id)) if os.path.isdir(os.path.join(_get_model_directory(model_id), d))])
     metadata["last_used"] = datetime.now().isoformat()
     _save_model_metadata(model_id, metadata)
     
@@ -195,33 +193,53 @@ def create_preset(model_id: str, preset_data: Dict[str, Any], preset_name: str =
 
 def get_preset(model_id: str, preset_id: str = None) -> Dict[str, Any]:
     """Get a specific preset for a model"""
-    presets_data = _load_model_presets(model_id)
-    
     if preset_id:
-        return presets_data.get("presets", {}).get(preset_id, {})
+        preset_file = _get_preset_file(model_id, preset_id)
+        if os.path.exists(preset_file):
+            try:
+                with open(preset_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Warning: Could not load preset {preset_id}: {e}")
+        return {}
     else:
-        # Return default preset
-        default_id = presets_data.get("default_preset")
-        if default_id:
-            return presets_data.get("presets", {}).get(default_id, {})
         # Return first available preset
-        presets = presets_data.get("presets", {})
-        if presets:
-            return list(presets.values())[0]
+        model_dir = _get_model_directory(model_id)
+        if os.path.exists(model_dir):
+            for item in os.listdir(model_dir):
+                if os.path.isdir(os.path.join(model_dir, item)) and item != "metadata.json":
+                    preset_file = _get_preset_file(model_id, item)
+                    if os.path.exists(preset_file):
+                        try:
+                            with open(preset_file, "r", encoding="utf-8") as f:
+                                return json.load(f)
+                        except Exception as e:
+                            print(f"Warning: Could not load preset {item}: {e}")
         return {}
 
 
 def get_all_presets(model_id: str) -> Dict[str, Any]:
     """Get all presets for a model"""
-    return _load_model_presets(model_id)
+    presets = {}
+    model_dir = _get_model_directory(model_id)
+    
+    if os.path.exists(model_dir):
+        for item in os.listdir(model_dir):
+            if os.path.isdir(os.path.join(model_dir, item)) and item != "metadata.json":
+                preset_file = _get_preset_file(model_id, item)
+                if os.path.exists(preset_file):
+                    try:
+                        with open(preset_file, "r", encoding="utf-8") as f:
+                            presets[item] = json.load(f)
+                    except Exception as e:
+                        print(f"Warning: Could not load preset {item}: {e}")
+    
+    return {"presets": presets}
 
 
 def save_preview_image(model_id: str, preset_id: str, image_tensor: torch.Tensor) -> str:
     """Save a preview image for a preset"""
-    previews_dir = _get_model_previews_dir(model_id)
-    os.makedirs(previews_dir, exist_ok=True)
-    
-    preview_file = os.path.join(previews_dir, f"{preset_id}.png")
+    preview_file = _get_preset_preview_file(model_id, preset_id)
     
     # Convert tensor to PIL and save
     if image_tensor is not None and image_tensor.shape[0] > 0:
@@ -235,7 +253,7 @@ def save_preview_image(model_id: str, preset_id: str, image_tensor: torch.Tensor
 
 def load_preview_image(model_id: str, preset_id: str) -> Optional[torch.Tensor]:
     """Load a preview image for a preset"""
-    preview_file = os.path.join(_get_model_previews_dir(model_id), f"{preset_id}.png")
+    preview_file = _get_preset_preview_file(model_id, preset_id)
     
     if os.path.exists(preview_file):
         try:
@@ -255,29 +273,16 @@ def list_models() -> List[Dict[str, Any]]:
 
 def delete_preset(model_id: str, preset_id: str) -> bool:
     """Delete a specific preset"""
-    presets_data = _load_model_presets(model_id)
+    preset_dir = _get_preset_directory(model_id, preset_id)
     
-    if preset_id in presets_data.get("presets", {}):
-        # Remove preset
-        del presets_data["presets"][preset_id]
+    if os.path.exists(preset_dir):
+        # Remove entire preset directory
+        shutil.rmtree(preset_dir)
         
-        # Update default if this was the default
-        if presets_data.get("default_preset") == preset_id:
-            presets = presets_data.get("presets", {})
-            presets_data["default_preset"] = list(presets.keys())[0] if presets else None
-        
-        # Save updated presets
-        _save_model_presets(model_id, presets_data)
-        
-        # Update metadata
+        # Update model metadata
         metadata = _load_model_metadata(model_id)
-        metadata["preset_count"] = len(presets_data.get("presets", {}))
+        metadata["preset_count"] = len([d for d in os.listdir(_get_model_directory(model_id)) if os.path.isdir(os.path.join(_get_model_directory(model_id), d))])
         _save_model_metadata(model_id, metadata)
-        
-        # Delete preview image
-        preview_file = os.path.join(_get_model_previews_dir(model_id), f"{preset_id}.png")
-        if os.path.exists(preview_file):
-            os.remove(preview_file)
         
         return True
     return False
