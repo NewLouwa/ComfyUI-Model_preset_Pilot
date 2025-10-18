@@ -95,78 +95,8 @@ class PresetCreator:
         
     @classmethod
     def get_js(cls):
-        # Add custom JavaScript for the Preset Creator UI
-        js = """
-        // Add custom JavaScript for the Preset Creator node
-        function setupPresetCreatorUI(node) {
-            // Create save button
-            const saveButton = document.createElement("button");
-            saveButton.textContent = "💾 Save Preset";
-            saveButton.style.margin = "10px 0";
-            saveButton.style.padding = "8px 16px";
-            saveButton.style.backgroundColor = "#2a5a2a";
-            saveButton.style.color = "white";
-            saveButton.style.border = "none";
-            saveButton.style.borderRadius = "6px";
-            saveButton.style.cursor = "pointer";
-            saveButton.style.fontSize = "14px";
-            saveButton.style.fontWeight = "bold";
-            saveButton.style.width = "100%";
-            
-            // Add hover effect
-            saveButton.addEventListener("mouseover", () => {
-                saveButton.style.backgroundColor = "#3a6a3a";
-            });
-            saveButton.addEventListener("mouseout", () => {
-                saveButton.style.backgroundColor = "#2a5a2a";
-            });
-            
-            // Create status display
-            const statusDisplay = document.createElement("div");
-            statusDisplay.className = "preset-creator-status";
-            statusDisplay.style.margin = "10px 0";
-            statusDisplay.style.padding = "8px";
-            statusDisplay.style.backgroundColor = "rgba(0,0,0,0.3)";
-            statusDisplay.style.borderRadius = "4px";
-            statusDisplay.style.fontSize = "12px";
-            statusDisplay.style.fontFamily = "monospace";
-            statusDisplay.style.color = "#ccc";
-            statusDisplay.style.border = "1px solid #444";
-            statusDisplay.innerHTML = "Ready to save preset";
-            
-            // Add elements to the node
-            const nodeContainer = node.widgets[0].options.el.parentElement.parentElement;
-            nodeContainer.appendChild(saveButton);
-            nodeContainer.appendChild(statusDisplay);
-            
-            // Handle save button click
-            saveButton.addEventListener("click", () => {
-                statusDisplay.innerHTML = "💾 Saving preset...";
-                statusDisplay.style.color = "#ffa500";
-                
-                // Set the save_preset widget to true
-                const saveWidget = node.widgets.find(w => w.name === "save_preset");
-                if (saveWidget) {
-                    saveWidget.value = true;
-                }
-                
-                // Trigger node execution
-                node.setDirtyCanvas(true);
-            });
-        }
-        
-        // Register a callback when nodes are added to the graph
-        app.registerExtension({
-            name: "PresetCreator.UI",
-            async nodeCreated(node) {
-                if (node.comfyClass === "PresetCreator") {
-                    // Wait for widgets to be created
-                    setTimeout(() => setupPresetCreatorUI(node), 100);
-                }
-            }
-        });
-        """
-        return js
+        # No custom JavaScript needed - using ComfyUI's native boolean widget
+        return ""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -187,7 +117,7 @@ class PresetCreator:
                 "preset_name": ("STRING", {"default": ""}),
             },
             "widgets": {
-                "save_preset": ("BUTTON", {"label": "💾 Save Preset"}),
+                "save_preset": ("BOOLEAN", {"default": False, "label": "💾 Save Preset"}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
