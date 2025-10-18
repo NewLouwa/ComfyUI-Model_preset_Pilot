@@ -90,7 +90,15 @@ def api_load_preview_image(json_data):
         return {"success": False, "error": str(e)}
 
 # Register the API endpoint
-PromptServer.instance.add_api_route("/model_preset_pilot/upload_preview", api_load_preview_image, methods=["POST"])
+try:
+    # Try the new ComfyUI API method first
+    if hasattr(PromptServer.instance, 'add_api_route'):
+        PromptServer.instance.add_api_route("/model_preset_pilot/upload_preview", api_load_preview_image, methods=["POST"])
+    else:
+        # Fallback to the older method
+        PromptServer.instance.app.add_route("/model_preset_pilot/upload_preview", api_load_preview_image, methods=["POST"])
+except Exception as e:
+    print(f"Warning: Could not register API route: {e}")
 
 
 def _sanitize_filename(name: str) -> str:
