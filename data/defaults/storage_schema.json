@@ -1,0 +1,35 @@
+{
+  "storage_schema": {
+    "version": "1.0",
+    "description": "Storage schema for model presets",
+    "structure": {
+      "base_path": "F:/ComfyUI/user/model_presets",
+      "models_directory": "models",
+      "previews_directory": "previews",
+      "index_file": "index.json"
+    },
+    "model_structure": {
+      "model_directory": "{model_id}",
+      "presets_file": "presets.json",
+      "previews_directory": "previews",
+      "metadata_file": "metadata.json"
+    },
+    "preset_schema": {
+      "id": "string (unique within model)",
+      "name": "string (user-friendly name)",
+      "description": "string (optional)",
+      "sampler_name": "string",
+      "scheduler": "string", 
+      "steps": "integer",
+      "cfg": "float",
+      "clip_skip": "integer",
+      "width": "integer",
+      "height": "integer",
+      "seed": "integer",
+      "created_at": "timestamp",
+      "updated_at": "timestamp",
+      "preview_image": "string (filename)",
+      "tags": "array of strings (optional)"
+    }
+  }
+}
