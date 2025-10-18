@@ -33,8 +33,16 @@ except Exception:
 COMFY_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 PRESET_DIR = os.path.join(COMFY_ROOT, "user", "model_presets")
 PREVIEW_DIR = os.path.join(PRESET_DIR, "previews")
+
+# Data directory for default assets and templates
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+DEFAULTS_DIR = os.path.join(DATA_DIR, "defaults")
+ASSETS_DIR = os.path.join(DATA_DIR, "assets")
+
 os.makedirs(PRESET_DIR, exist_ok=True)
 os.makedirs(PREVIEW_DIR, exist_ok=True)
+os.makedirs(DEFAULTS_DIR, exist_ok=True)
+os.makedirs(ASSETS_DIR, exist_ok=True)
 
 # Register our custom API endpoint for file uploads
 def api_load_preview_image(json_data):
@@ -154,12 +162,32 @@ def _get_preview_info(model_id: str) -> Dict[str, Any]:
     return info
 
 
+def _load_default_templates() -> Dict[str, Any]:
+    """Load default preset templates from data directory"""
+    templates_path = os.path.join(DEFAULTS_DIR, "preset_templates.json")
+    if os.path.exists(templates_path):
+        try:
+            with open(templates_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Could not load default templates: {e}")
+    return {"default_presets": {}}
+
 def _load_preset(model_id: str) -> Dict[str, Any]:
     path = _preset_path(model_id)
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    # Sensible defaults if no preset exists yet
+    
+    # Try to load from default templates
+    templates = _load_default_templates()
+    default_presets = templates.get("default_presets", {})
+    
+    # Use realistic preset as default if available
+    if "realistic" in default_presets:
+        return default_presets["realistic"]
+    
+    # Fallback to sensible defaults
     return {
         "sampler_name": "dpmpp_2m" if "dpmpp_2m" in SAMPLER_CHOICES else SAMPLER_CHOICES[0],
         "scheduler": "karras" if "karras" in SCHEDULER_CHOICES else SCHEDULER_CHOICES[0],
