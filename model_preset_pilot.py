@@ -421,7 +421,7 @@ class ModelPresetPilot:
         "clip_skip", "width", "height", "seed", "preview"
     )
     FUNCTION = "run"
-    CATEGORY = "Custom/Model Presets"
+    CATEGORY = "🤖 Model Preset Pilot"
 
     def _encode_if_needed(self, clip, positive, negative):
         if clip is None:
@@ -547,7 +547,7 @@ class ModelPresetPilotWidget:
     RETURN_TYPES = ()
     FUNCTION = "load_image"
     OUTPUT_NODE = True
-    CATEGORY = "Custom/Model Presets"
+    CATEGORY = "🤖 Model Preset Pilot"
 
     def load_image(self, node_id):
         return {}
