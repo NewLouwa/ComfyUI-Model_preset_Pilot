@@ -1,5 +1,16 @@
 {
   "default_presets": {
+    "none": {
+      "sampler_name": "none",
+      "scheduler": "none",
+      "steps": 0,
+      "cfg": 0.0,
+      "clip_skip": 0,
+      "width": 0,
+      "height": 0,
+      "seed": 0,
+      "description": "Empty preset - no values set"
+    },
     "realistic": {
       "sampler_name": "dpmpp_2m",
       "scheduler": "karras",

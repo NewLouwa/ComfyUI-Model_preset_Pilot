@@ -183,9 +183,11 @@ def _load_preset(model_id: str) -> Dict[str, Any]:
     templates = _load_default_templates()
     default_presets = templates.get("default_presets", {})
     
-    # Use realistic preset as default if available
+    # Use realistic preset as default if available, otherwise use none
     if "realistic" in default_presets:
         return default_presets["realistic"]
+    elif "none" in default_presets:
+        return default_presets["none"]
     
     # Fallback to sensible defaults
     return {
