@@ -199,6 +199,8 @@ class ModelPresetPilot:
       • update: partial update of existing preset
     """
     
+    aux_id = "NewLouwa/ComfyUI-Model_preset_Pilot"
+    
     @classmethod
     def IS_CHANGED(cls, **kwargs):
         return float("NaN")  # Always update to handle button clicks
@@ -528,6 +530,8 @@ class ModelPresetPilot:
 
 # Add a custom UI component for the load image button
 class ModelPresetPilotWidget:
+    aux_id = "NewLouwa/ComfyUI-Model_preset_Pilot"
+    
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {"node_id": ("STRING", {"multiline": False})}}
