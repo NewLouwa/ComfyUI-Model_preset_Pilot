@@ -30,18 +30,11 @@ except Exception:
     SAMPLER_CHOICES = ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
     SCHEDULER_CHOICES = ["normal", "karras", "exponential", "sgm_uniform"]
 
-# Where we'll persist presets & previews
-COMFY_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-PRESET_DIR = os.path.join(COMFY_ROOT, "user", "model_presets")
-PREVIEW_DIR = os.path.join(PRESET_DIR, "previews")
-
 # Data directory for default assets and templates
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 DEFAULTS_DIR = os.path.join(DATA_DIR, "defaults")
 ASSETS_DIR = os.path.join(DATA_DIR, "assets")
 
-os.makedirs(PRESET_DIR, exist_ok=True)
-os.makedirs(PREVIEW_DIR, exist_ok=True)
 os.makedirs(DEFAULTS_DIR, exist_ok=True)
 os.makedirs(ASSETS_DIR, exist_ok=True)
 

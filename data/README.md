@@ -6,8 +6,16 @@ This directory contains default data and assets for the ComfyUI Model Preset Pil
 
 ```
 data/
+├── presets/            # User-created presets (auto-generated)
+│   ├── index.json      # Model registry
+│   └── models/         # Individual model presets
+│       └── model_name/
+│           ├── presets.json
+│           ├── metadata.json
+│           └── previews/
 ├── defaults/           # Default configuration files
-│   └── preset_templates.json    # Default preset templates
+│   ├── preset_templates.json    # Default preset templates
+│   └── storage_schema.json     # Storage schema definition
 ├── assets/             # Static assets (images, icons, etc.)
 │   └── default_preview.png     # Default preview image
 └── README.md           # This file

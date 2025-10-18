@@ -3,7 +3,7 @@
     "version": "1.0",
     "description": "Storage schema for model presets",
     "structure": {
-      "base_path": "F:/ComfyUI/user/model_presets",
+      "base_path": "ComfyUI-Model_preset_Pilot/data/presets",
       "models_directory": "models",
       "previews_directory": "previews",
       "index_file": "index.json"

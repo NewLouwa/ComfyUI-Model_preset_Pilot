@@ -11,9 +11,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch
 from PIL import Image
 
-# Storage configuration
-COMFY_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-BASE_PRESET_DIR = os.path.join(COMFY_ROOT, "user", "model_presets")
+# Storage configuration - Keep everything within the node module
+NODE_ROOT = os.path.dirname(os.path.dirname(__file__))  # Go up to ComfyUI-Model_preset_Pilot
+BASE_PRESET_DIR = os.path.join(NODE_ROOT, "data", "presets")
 MODELS_DIR = os.path.join(BASE_PRESET_DIR, "models")
 INDEX_FILE = os.path.join(BASE_PRESET_DIR, "index.json")
 
