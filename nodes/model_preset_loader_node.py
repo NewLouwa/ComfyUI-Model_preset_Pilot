@@ -192,9 +192,9 @@ def _image_tensor_to_pil(t: torch.Tensor) -> Image.Image:
     return Image.fromarray(arr)
 
 
-class ModelPresetPilot:
+class ModelPresetLoader:
     """
-    Simplified Model Preset Pilot node with image preview and text display
+    Model Preset Loader - loads and displays model presets with preview
     """
     
     aux_id = "NewLouwa/ComfyUI-Model_preset_Pilot"
@@ -211,8 +211,8 @@ class ModelPresetPilot:
     def get_js(cls):
         # Add custom JavaScript for the simplified UI
         js = """
-        // Add custom JavaScript for the Model Preset Pilot node
-        function setupModelPresetPilotUI(node) {
+        // Add custom JavaScript for the Model Preset Loader node
+        function setupModelPresetLoaderUI(node) {
             // Create image preview canvas
             const previewCanvas = document.createElement("canvas");
             previewCanvas.width = 200;
@@ -260,11 +260,11 @@ class ModelPresetPilot:
         
         // Register a callback when nodes are added to the graph
         app.registerExtension({
-            name: "ModelPresetPilot.UI",
+            name: "ModelPresetLoader.UI",
             async nodeCreated(node) {
-                if (node.comfyClass === "ModelPresetPilot") {
+                if (node.comfyClass === "ModelPresetLoader") {
                     // Wait for widgets to be created
-                    setTimeout(() => setupModelPresetPilotUI(node), 100);
+                    setTimeout(() => setupModelPresetLoaderUI(node), 100);
                 }
             }
         });
