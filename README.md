@@ -21,6 +21,7 @@ A ComfyUI custom node module for managing model presets and configurations. This
 - **Preset Parameters**: sampler, scheduler, steps, CFG, clip-skip, seed, resolution
 - **Preview Generation**: Create and cache standardized preview images for each model
 - **Manual Preview Loading**: Easily load custom images as model previews
+- **File Browser Integration**: Upload preview images directly from your computer
 - **Multiple Operation Modes**: Load, Save, Update
 - **Flexible Input Options**: Works with both direct conditioning or CLIP+text
 
@@ -55,10 +56,17 @@ To manually load an image as a model preview:
 2. Set "load_image" to True
 3. Run the node to save the image as the model's preview
 
-The manually loaded image will be:
+#### File Browser Upload
+To upload an image directly from your computer:
+1. Connect a model or specify a checkpoint name
+2. Click the "Browse for preview image..." button that appears in the node
+3. Select an image file from your computer
+4. The image will be automatically uploaded and set as the model's preview
+
+The preview images (whether loaded manually or uploaded via file browser) will be:
 - Copied to the model's preview directory
 - Displayed whenever the model is loaded
-- Backed up if it already exists (as .png.bak)
+- Backed up if they already exist (as .png.bak)
 
 ### File Storage
 

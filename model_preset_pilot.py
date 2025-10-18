@@ -12,14 +12,19 @@ import os
 import json
 import hashlib
 import shutil
+import base64
+import mimetypes
 from typing import Any, Dict, Optional, List, Tuple
 
 import torch
 from PIL import Image
+import numpy as np
 
 import comfy.utils
 import nodes
 import folder_paths
+import server
+from server import PromptServer
 
 # Try to read available samplers/schedulers from Comfy's KSampler;
 # fall back to a safe list if the attributes aren't exposed.
@@ -37,6 +42,55 @@ PRESET_DIR = os.path.join(COMFY_ROOT, "user", "model_presets")
 PREVIEW_DIR = os.path.join(PRESET_DIR, "previews")
 os.makedirs(PRESET_DIR, exist_ok=True)
 os.makedirs(PREVIEW_DIR, exist_ok=True)
+
+# Register our custom API endpoint for file uploads
+def api_load_preview_image(json_data):
+    """API endpoint to handle preview image uploads"""
+    try:
+        if "image_data" not in json_data or "model_id" not in json_data:
+            return {"success": False, "error": "Missing required data"}
+            
+        model_id = json_data["model_id"]
+        image_data = json_data["image_data"]
+        
+        # Decode base64 image
+        if "base64," in image_data:
+            image_data = image_data.split("base64,")[1]
+            
+        image_bytes = base64.b64decode(image_data)
+        
+        # Save to preview directory
+        preview_path = _preview_path(model_id)
+        
+        # Create backup if file exists
+        if os.path.exists(preview_path):
+            backup_path = f"{preview_path}.bak"
+            try:
+                shutil.copy2(preview_path, backup_path)
+            except Exception as e:
+                print(f"Warning: Failed to create backup: {e}")
+        
+        # Save new image
+        with open(preview_path, "wb") as f:
+            f.write(image_bytes)
+            
+        # Get image info
+        info = _get_preview_info(model_id)
+        
+        return {
+            "success": True,
+            "message": f"Preview image saved for model: {model_id}",
+            "path": preview_path,
+            "dimensions": info.get("dimensions"),
+            "size": info.get("size")
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}
+
+# Register the API endpoint
+PromptServer.instance.add_api_route("/model_preset_pilot/upload_preview", api_load_preview_image, methods=["POST"])
 
 
 def _sanitize_filename(name: str) -> str:
@@ -159,8 +213,10 @@ class ModelPresetPilot:
         js = """
         // Add custom JavaScript for the Model Preset Pilot node
         function setupModelPresetPilotUI(node) {
+            // Get widgets
             const loadImageCheckbox = node.widgets.filter(w => w.name === "load_image")[0];
-            if (!loadImageCheckbox) return;
+            const loadFromFileCheckbox = node.widgets.filter(w => w.name === "load_preview_from_file")[0];
+            if (!loadImageCheckbox || !loadFromFileCheckbox) return;
             
             // Create info display element
             const infoDiv = document.createElement("div");
@@ -176,10 +232,105 @@ class ModelPresetPilot:
             const widgetContainer = loadImageCheckbox.options.el.parentElement.parentElement;
             widgetContainer.parentElement.insertBefore(infoDiv, widgetContainer.nextSibling);
             
+            // Create file upload button
+            const uploadButton = document.createElement("button");
+            uploadButton.textContent = "Browse for preview image...";
+            uploadButton.style.margin = "10px 0";
+            uploadButton.style.padding = "5px 10px";
+            uploadButton.style.backgroundColor = "#2a2a2a";
+            uploadButton.style.color = "white";
+            uploadButton.style.border = "none";
+            uploadButton.style.borderRadius = "4px";
+            uploadButton.style.cursor = "pointer";
+            uploadButton.style.width = "100%";
+            
+            // Add hover effect
+            uploadButton.addEventListener("mouseover", () => {
+                uploadButton.style.backgroundColor = "#3a3a3a";
+            });
+            uploadButton.addEventListener("mouseout", () => {
+                uploadButton.style.backgroundColor = "#2a2a2a";
+            });
+            
+            // Add it after the info div
+            infoDiv.parentElement.insertBefore(uploadButton, infoDiv.nextSibling);
+            
+            // Create hidden file input
+            const fileInput = document.createElement("input");
+            fileInput.type = "file";
+            fileInput.accept = "image/*";
+            fileInput.style.display = "none";
+            uploadButton.parentElement.appendChild(fileInput);
+            
+            // Connect button to file input
+            uploadButton.addEventListener("click", () => {
+                fileInput.click();
+            });
+            
+            // Handle file selection
+            fileInput.addEventListener("change", async (event) => {
+                if (!event.target.files || !event.target.files[0]) return;
+                
+                const file = event.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = async (e) => {
+                    // Get model_id
+                    let model_id = "unknown";
+                    const modelInput = node.inputs ? node.inputs.find(i => i.name === "model") : null;
+                    const ckptInput = node.widgets.filter(w => w.name === "ckpt_name")[0];
+                    
+                    if (modelInput && modelInput.link) {
+                        // We have a model connected, but we can't directly access its ID
+                        // We'll use a placeholder and let the backend handle it
+                        model_id = "connected_model";
+                    } else if (ckptInput && ckptInput.value) {
+                        model_id = ckptInput.value;
+                    }
+                    
+                    // Show loading state
+                    infoDiv.innerHTML = "<b>Preview Image:</b> Uploading...";
+                    uploadButton.disabled = true;
+                    uploadButton.textContent = "Uploading...";
+                    
+                    try {
+                        // Send to server
+                        const response = await fetch("/model_preset_pilot/upload_preview", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                model_id: model_id,
+                                image_data: e.target.result
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            infoDiv.innerHTML = `<b>Preview Image:</b> Uploaded successfully<br>
+                                               Dimensions: ${result.dimensions ? result.dimensions.join('x') : 'unknown'}<br>
+                                               Path: ${result.path}`;
+                            // Force node to refresh
+                            loadFromFileCheckbox.value = true;
+                            node.widgets_values[node.widgets.indexOf(loadFromFileCheckbox)] = true;
+                        } else {
+                            infoDiv.innerHTML = `<b>Preview Image:</b> Upload failed - ${result.error}`;
+                        }
+                    } catch (error) {
+                        infoDiv.innerHTML = `<b>Preview Image:</b> Upload failed - ${error.message}`;
+                    } finally {
+                        uploadButton.disabled = false;
+                        uploadButton.textContent = "Browse for preview image...";
+                        fileInput.value = "";
+                    }
+                };
+                
+                reader.readAsDataURL(file);
+            });
+            
             // Update info when model changes
             const modelInput = node.inputs ? node.inputs.find(i => i.name === "model") : null;
             if (modelInput && modelInput.link) {
-                // TODO: Add code to update preview info when model changes
                 infoDiv.innerHTML = "<b>Preview Image:</b> Connect model to see info";
             }
         }
@@ -233,6 +384,9 @@ class ModelPresetPilot:
                 # Manual image loading
                 "load_image": ("BOOLEAN", {"default": False}),
                 "image": ("IMAGE", ),
+                
+                # File browser button (custom UI)
+                "load_preview_from_file": ("BOOLEAN", {"default": False}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
@@ -297,7 +451,7 @@ class ModelPresetPilot:
             sampler_name=SAMPLER_CHOICES[0], scheduler=SCHEDULER_CHOICES[0],
             steps=28, cfg=5.5, clip_skip=0, width=1024, height=1024, seed=0,
             generate_preview=False, overwrite_preview=False, load_image=False, image=None,
-            unique_id=None, extra_pnginfo=None):
+            load_preview_from_file=False, unique_id=None, extra_pnginfo=None):
 
         model_id = _model_identifier(model, ckpt_name)
         preset = _load_preset(model_id)
