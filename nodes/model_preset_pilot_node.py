@@ -1,12 +1,5 @@
-# model_preset_pilot.py
-# Custom node for ComfyUI
-# ------------------------------------------------------------
-# Name: Model Preset Pilot
-# Purpose:
-#  • Manage per-model presets (sampler, scheduler, steps, cfg, clip_skip, width, height, seed)
-#  • Automatically load / save / update these presets
-#  • Optionally generate and cache preview images per model
-# ------------------------------------------------------------
+# ModelPresetPilot Node
+# Custom ComfyUI node for managing model presets with preview
 
 import os
 import json
@@ -37,7 +30,7 @@ except Exception:
     SCHEDULER_CHOICES = ["normal", "karras", "exponential", "sgm_uniform"]
 
 # Where we'll persist presets & previews
-COMFY_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+COMFY_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 PRESET_DIR = os.path.join(COMFY_ROOT, "user", "model_presets")
 PREVIEW_DIR = os.path.join(PRESET_DIR, "previews")
 os.makedirs(PRESET_DIR, exist_ok=True)
@@ -201,10 +194,7 @@ def _image_tensor_to_pil(t: torch.Tensor) -> Image.Image:
 
 class ModelPresetPilot:
     """
-    Modes:
-      • load:   read preset or create default, optional cached preview
-      • save:   overwrite preset with current inputs, optional preview generation
-      • update: partial update of existing preset
+    Simplified Model Preset Pilot node with image preview and text display
     """
     
     aux_id = "NewLouwa/ComfyUI-Model_preset_Pilot"
@@ -307,21 +297,6 @@ class ModelPresetPilot:
     FUNCTION = "run"
     CATEGORY = "🤖 Model Preset Pilot"
 
-    def _encode_if_needed(self, clip, positive, negative):
-        if clip is None:
-            raise ValueError("Preview generation requires either (positive_cond/negative_cond) or (clip + text).")
-        enc = nodes.CLIPTextEncode()
-        return enc.encode(clip, positive)[0], enc.encode(clip, negative)[0]
-
-    def _generate_preview(self, model, vae, pos, neg, width, height, seed, steps, cfg, sampler, sched):
-        latent = nodes.EmptyLatentImage().generate(width, height, batch_size=1)[0]
-        out = nodes.KSampler().sample(
-            model=model, seed=seed, steps=steps, cfg=cfg,
-            sampler_name=sampler, scheduler=sched,
-            positive=pos, negative=neg, latent_image=latent
-        )[0]
-        return nodes.VAEDecode().decode(vae, out)[0]
-
     def _empty_image(self):
         return torch.zeros((1, 1, 1, 3), dtype=torch.float32)
 
@@ -368,12 +343,3 @@ class ModelPresetPilot:
                 preview_tensor = self._empty_image()
 
         return (model, preview_tensor, model_info)
-
-
-
-NODE_CLASS_MAPPINGS = {
-    "ModelPresetPilot": ModelPresetPilot,
-}
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ModelPresetPilot": "🧭 Model Preset Pilot",
-}
