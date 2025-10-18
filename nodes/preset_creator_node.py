@@ -144,6 +144,12 @@ class PresetCreator:
                 statusDisplay.innerHTML = "💾 Saving preset...";
                 statusDisplay.style.color = "#ffa500";
                 
+                // Set the save_preset widget to true
+                const saveWidget = node.widgets.find(w => w.name === "save_preset");
+                if (saveWidget) {
+                    saveWidget.value = true;
+                }
+                
                 // Trigger node execution
                 node.setDirtyCanvas(true);
             });
@@ -180,6 +186,9 @@ class PresetCreator:
                 "image": ("IMAGE",),
                 "preset_name": ("STRING", {"default": ""}),
             },
+            "widgets": {
+                "save_preset": ("BUTTON", {"label": "💾 Save Preset"}),
+            },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
                 "extra_pnginfo": "EXTRA_PNGINFO",
@@ -215,34 +224,40 @@ class PresetCreator:
         _image_tensor_to_pil(image_tensor).save(preview_file)
         
     def run(self, model, sampler_name, scheduler, steps, cfg, clip_skip, width, height, seed, 
-            image=None, preset_name="", unique_id=None, extra_pnginfo=None):
+            image=None, preset_name="", save_preset=False, unique_id=None, extra_pnginfo=None):
         
         # Get model identifier
         model_id = _model_identifier(model, None)
         
-        # Create preset data
-        preset_data = {
-            "sampler_name": sampler_name,
-            "scheduler": scheduler,
-            "steps": steps,
-            "cfg": cfg,
-            "clip_skip": clip_skip,
-            "width": width,
-            "height": height,
-            "seed": seed,
-            "preset_name": preset_name if preset_name else f"Preset_{model_id}",
-            "created_at": str(torch.cuda.Event(enable_timing=True).elapsed_time(torch.cuda.Event(enable_timing=True))),
-        }
-        
-        # Save preset
-        _save_preset(model_id, preset_data)
-        
-        # Save preview image if provided
-        if image is not None and image.shape[0] > 0:
-            preview_file = _preview_path(model_id)
-            self._save_image_as_preview(image, preview_file)
-        
-        # Create status message
-        status = f"✅ Preset saved for {model_id}\n📝 Name: {preset_data['preset_name']}\n⚙️ Settings: {sampler_name}, {scheduler}, {steps} steps"
+        if save_preset:
+            # Import storage manager functions
+            from .storage_manager import create_preset, save_preview_image
+            
+            # Create preset data
+            preset_data = {
+                "sampler_name": sampler_name,
+                "scheduler": scheduler,
+                "steps": steps,
+                "cfg": cfg,
+                "clip_skip": clip_skip,
+                "width": width,
+                "height": height,
+                "seed": seed,
+                "description": f"Preset created for {model_id}",
+                "tags": ["user_created"]
+            }
+            
+            # Create preset using storage manager
+            preset_id = create_preset(model_id, preset_data, preset_name)
+            
+            # Save preview image if provided
+            if image is not None and image.shape[0] > 0:
+                save_preview_image(model_id, preset_id, image)
+            
+            # Create status message
+            status = f"✅ Preset saved!\n📝 Name: {preset_id}\n📁 Location: {model_id}/{preset_id}\n⚙️ Settings: {sampler_name}, {scheduler}, {steps} steps"
+        else:
+            # Just show current settings without saving
+            status = f"📋 Current Settings:\n⚙️ {sampler_name}, {scheduler}, {steps} steps\n💾 Click 'Save Preset' to save these settings"
         
         return (model, status)
