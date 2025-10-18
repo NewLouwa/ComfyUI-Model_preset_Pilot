@@ -370,27 +370,10 @@ class ModelPresetPilot:
         return (model, preview_tensor, model_info)
 
 
-# Add a custom UI component for the load image button
-class ModelPresetPilotWidget:
-    aux_id = "NewLouwa/ComfyUI-Model_preset_Pilot"
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {"required": {"node_id": ("STRING", {"multiline": False})}}
-    
-    RETURN_TYPES = ()
-    FUNCTION = "load_image"
-    OUTPUT_NODE = True
-    CATEGORY = "🤖 Model Preset Pilot"
-
-    def load_image(self, node_id):
-        return {}
 
 NODE_CLASS_MAPPINGS = {
     "ModelPresetPilot": ModelPresetPilot,
-    "ModelPresetPilotWidget": ModelPresetPilotWidget
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ModelPresetPilot": "🧭 Model Preset Pilot",
-    "ModelPresetPilotWidget": "🖼️ Load Model Preview Image"
 }
