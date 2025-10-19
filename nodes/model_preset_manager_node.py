@@ -91,9 +91,9 @@ def _get_all_preset_choices():
         
         if not os.path.exists(presets_dir):
             print(f"Presets directory does not exist: {presets_dir}")
-            return ["none"]
+            return ["new_preset"]
         
-        choices = ["none"]
+        choices = ["new_preset"]
         
         # Scan presets directory directly
         print(f"Scanning presets directory: {presets_dir}")
@@ -119,10 +119,10 @@ def _get_all_preset_choices():
         return choices
     except Exception as e:
         print(f"Error loading preset choices: {e}")
-        return ["none"]
+        return ["new_preset"]
 
 # Initialize preset choices at module level
-_preset_choices = ["none"]
+_preset_choices = ["new_preset"]
 
 def _get_default_preview_image() -> torch.Tensor:
     """Get a default preview image when no preset preview is available"""
@@ -225,7 +225,7 @@ class ModelPresetManager:
             clip_skip=0, width=1024, height=1024, seed=0, unique_id=None, extra_pnginfo=None):
         
         # Handle preset loading
-        if preset_name and preset_name != "none":
+        if preset_name and preset_name != "new_preset":
             try:
                 # Parse the preset_name format: "model_name/preset_name"
                 if "/" in preset_name:
@@ -309,14 +309,24 @@ class ModelPresetManager:
                 import os
                 model_id = os.path.splitext(os.path.basename(model_name))[0]
                 
-                # Create preset data
-                preset_id = new_preset_name if new_preset_name else f"preset_{int(datetime.now().timestamp())}"
-                preset_display_name = new_preset_name if new_preset_name else f"Preset for {model_id}"
+                if preset_name == "new_preset":
+                    # Creating a new preset
+                    preset_id = new_preset_name if new_preset_name else f"preset_{int(datetime.now().timestamp())}"
+                    preset_display_name = new_preset_name if new_preset_name else f"Preset for {model_id}"
+                    action = "created"
+                else:
+                    # Modifying existing preset
+                    if "/" in preset_name:
+                        _, preset_id = preset_name.split("/", 1)
+                    else:
+                        preset_id = preset_name
+                    preset_display_name = preset_id
+                    action = "updated"
                 
                 preset_data = {
                     "id": preset_id,
                     "name": preset_display_name,
-                    "description": f"Preset created for {model_id}",
+                    "description": f"Preset {action} for {model_id}",
                     "sampler_name": sampler_name,
                     "scheduler": scheduler,
                     "steps": steps,
@@ -347,7 +357,7 @@ class ModelPresetManager:
                 _save_model_database(db)
                 
                 # Display success message
-                status_msg = f"✅ Preset saved! 📝 Name: {preset_data['name']} 📁 Location: {model_id}/{preset_data['id']} ⚙️ Settings: {sampler_name}, {scheduler}, {steps} steps"
+                status_msg = f"✅ Preset {action}! 📝 Name: {preset_data['name']} 📁 Location: {model_id}/{preset_data['id']} ⚙️ Settings: {sampler_name}, {scheduler}, {steps} steps"
                 print(status_msg)
                 
                 # Return default image and success message
@@ -376,7 +386,7 @@ class ModelPresetManager:
         except Exception as display_e:
             print(f"Warning: Could not display default image: {display_e}")
         
-        return ("No preset data", default_image, "📋 Select a preset or enable 'Save Preset'")
+        return ("No preset data", default_image, "📋 Select a preset to load, or 'new_preset' + Save Preset to create")
 
 # Node mappings for ComfyUI
 NODE_CLASS_MAPPINGS = {
