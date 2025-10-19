@@ -21,27 +21,85 @@ from .storage_manager import create_preset, get_preset, get_all_presets, save_pr
 
 # Get available samplers/schedulers dynamically from ComfyUI
 def _get_sampler_choices():
-    """Get available samplers from ComfyUI"""
+    """Get available samplers from all ComfyUI nodes"""
     try:
-        from nodes import KSampler
-        if hasattr(KSampler, "SAMPLERS"):
-            return KSampler.SAMPLERS
-        else:
-            # Fallback to common samplers
-            return ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
-    except Exception:
+        import nodes
+        samplers = set()
+        
+        # Try to get from KSampler first
+        try:
+            from nodes import KSampler
+            if hasattr(KSampler, "SAMPLERS"):
+                samplers.update(KSampler.SAMPLERS)
+        except:
+            pass
+        
+        # Scan all nodes for sampler attributes
+        for node_name, node_class in nodes.NODE_CLASS_MAPPINGS.items():
+            try:
+                if hasattr(node_class, 'INPUT_TYPES'):
+                    input_types = node_class.INPUT_TYPES()
+                    if isinstance(input_types, dict):
+                        # Check required inputs
+                        for input_name, input_config in input_types.get("required", {}).items():
+                            if "sampler" in input_name.lower() and isinstance(input_config, (list, tuple)):
+                                if len(input_config) > 0 and isinstance(input_config[0], list):
+                                    samplers.update(input_config[0])
+                        # Check optional inputs
+                        for input_name, input_config in input_types.get("optional", {}).items():
+                            if "sampler" in input_name.lower() and isinstance(input_config, (list, tuple)):
+                                if len(input_config) > 0 and isinstance(input_config[0], list):
+                                    samplers.update(input_config[0])
+            except:
+                continue
+        
+        # Convert to sorted list
+        sampler_list = sorted(list(samplers))
+        print(f"Found {len(sampler_list)} samplers: {sampler_list}")
+        return sampler_list if sampler_list else ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
+    except Exception as e:
+        print(f"Error getting samplers: {e}")
         return ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
 
 def _get_scheduler_choices():
-    """Get available schedulers from ComfyUI"""
+    """Get available schedulers from all ComfyUI nodes"""
     try:
-        from nodes import KSampler
-        if hasattr(KSampler, "SCHEDULERS"):
-            return KSampler.SCHEDULERS
-        else:
-            # Fallback to common schedulers
-            return ["normal", "karras", "exponential", "sgm_uniform"]
-    except Exception:
+        import nodes
+        schedulers = set()
+        
+        # Try to get from KSampler first
+        try:
+            from nodes import KSampler
+            if hasattr(KSampler, "SCHEDULERS"):
+                schedulers.update(KSampler.SCHEDULERS)
+        except:
+            pass
+        
+        # Scan all nodes for scheduler attributes
+        for node_name, node_class in nodes.NODE_CLASS_MAPPINGS.items():
+            try:
+                if hasattr(node_class, 'INPUT_TYPES'):
+                    input_types = node_class.INPUT_TYPES()
+                    if isinstance(input_types, dict):
+                        # Check required inputs
+                        for input_name, input_config in input_types.get("required", {}).items():
+                            if "scheduler" in input_name.lower() and isinstance(input_config, (list, tuple)):
+                                if len(input_config) > 0 and isinstance(input_config[0], list):
+                                    schedulers.update(input_config[0])
+                        # Check optional inputs
+                        for input_name, input_config in input_types.get("optional", {}).items():
+                            if "scheduler" in input_name.lower() and isinstance(input_config, (list, tuple)):
+                                if len(input_config) > 0 and isinstance(input_config[0], list):
+                                    schedulers.update(input_config[0])
+            except:
+                continue
+        
+        # Convert to sorted list
+        scheduler_list = sorted(list(schedulers))
+        print(f"Found {len(scheduler_list)} schedulers: {scheduler_list}")
+        return scheduler_list if scheduler_list else ["normal", "karras", "exponential", "sgm_uniform"]
+    except Exception as e:
+        print(f"Error getting schedulers: {e}")
         return ["normal", "karras", "exponential", "sgm_uniform"]
 
 # Data directory for default assets and templates
