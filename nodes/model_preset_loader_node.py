@@ -642,6 +642,19 @@ class ModelPresetLoader:
                 # Load preview image for this preset
                 preview_image = _load_preset_preview_image(preset_model_id, preset_id)
                 
+                # Display preview image internally
+                try:
+                    import comfy.utils
+                    # Convert to numpy array for display
+                    if preview_image is not None:
+                        img_array = (preview_image[0].clamp(0, 1).cpu().numpy() * 255).astype(np.uint8)
+                        if hasattr(comfy.utils, 'save_images'):
+                            comfy.utils.save_images(img_array, filename_prefix="preset_preview")
+                        else:
+                            print(f"Preview: Displaying preset image {img_array.shape}")
+                except Exception as e:
+                    print(f"Warning: Could not display preview image: {e}")
+                
                 # Return preset data as string and preview image
                 import json
                 preset_json = json.dumps(preset_data, indent=2)
@@ -651,10 +664,36 @@ class ModelPresetLoader:
                 print(f"Warning: Could not load preset '{preset_name}': {e}")
                 # Return default image and error message
                 default_image = _get_default_preview_image()
+                
+                # Display default image internally
+                try:
+                    import comfy.utils
+                    if default_image is not None:
+                        img_array = (default_image[0].clamp(0, 1).cpu().numpy() * 255).astype(np.uint8)
+                        if hasattr(comfy.utils, 'save_images'):
+                            comfy.utils.save_images(img_array, filename_prefix="preset_error")
+                        else:
+                            print(f"Preview: Displaying error image {img_array.shape}")
+                except Exception as display_e:
+                    print(f"Warning: Could not display error image: {display_e}")
+                
                 return ("Error loading preset", default_image)
         else:
             print("No preset selected")
             # Return default image and no data message
             default_image = _get_default_preview_image()
+            
+            # Display default image internally
+            try:
+                import comfy.utils
+                if default_image is not None:
+                    img_array = (default_image[0].clamp(0, 1).cpu().numpy() * 255).astype(np.uint8)
+                    if hasattr(comfy.utils, 'save_images'):
+                        comfy.utils.save_images(img_array, filename_prefix="preset_default")
+                    else:
+                        print(f"Preview: Displaying default image {img_array.shape}")
+            except Exception as display_e:
+                print(f"Warning: Could not display default image: {display_e}")
+            
             return ("No preset data", default_image)
     
