@@ -16,6 +16,21 @@ import comfy.utils
 import nodes
 import folder_paths
 
+
+def _pil_to_image_tensor(pil: Image.Image) -> torch.Tensor:
+    """Convert PIL Image to ComfyUI tensor format [1,H,W,C]"""
+    img = pil.convert("RGB")
+    arr = comfy.utils.to_uint8(img)  # numpy array uint8
+    t = torch.from_numpy(arr).float() / 255.0
+    return t.unsqueeze(0)  # batch = 1
+
+
+def _image_tensor_to_pil(t: torch.Tensor) -> Image.Image:
+    """Convert ComfyUI tensor [1,H,W,C] to PIL Image"""
+    t = t[0].clamp(0, 1)
+    arr = (t.cpu().numpy() * 255).astype("uint8")
+    return Image.fromarray(arr)
+
 # Try to read available samplers/schedulers from Comfy's KSampler
 try:
     from nodes import KSampler

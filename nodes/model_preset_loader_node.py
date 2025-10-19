@@ -233,6 +233,21 @@ def _get_preview_info(model_id: str) -> Dict[str, Any]:
     return info
 
 
+def _pil_to_image_tensor(pil: Image.Image) -> torch.Tensor:
+    """Convert PIL Image to ComfyUI tensor format [1,H,W,C]"""
+    img = pil.convert("RGB")
+    arr = comfy.utils.to_uint8(img)  # numpy array uint8
+    t = torch.from_numpy(arr).float() / 255.0
+    return t.unsqueeze(0)  # batch = 1
+
+
+def _image_tensor_to_pil(t: torch.Tensor) -> Image.Image:
+    """Convert ComfyUI tensor [1,H,W,C] to PIL Image"""
+    t = t[0].clamp(0, 1)
+    arr = (t.cpu().numpy() * 255).astype("uint8")
+    return Image.fromarray(arr)
+
+
 def _get_default_preview_image() -> torch.Tensor:
     """Get a default preview image from the defaults directory"""
     default_images = [
@@ -246,11 +261,8 @@ def _get_default_preview_image() -> torch.Tensor:
         img_path = os.path.join(DEFAULTS_DIR, img_name)
         if os.path.exists(img_path):
             try:
-                img = Image.open(img_path).convert("RGB")
-                # Convert to tensor format expected by ComfyUI
-                arr = np.array(img).astype(np.float32) / 255.0
-                tensor = torch.from_numpy(arr).unsqueeze(0)  # Add batch dimension
-                return tensor
+                pil = Image.open(img_path)
+                return _pil_to_image_tensor(pil)
             except Exception as e:
                 print(f"Warning: Could not load default image {img_name}: {e}")
                 continue
@@ -261,21 +273,9 @@ def _get_default_preview_image() -> torch.Tensor:
 
 def _create_fallback_image() -> torch.Tensor:
     """Create a simple fallback image if no defaults are available"""
-    # Create a simple 512x512 image with a gradient
-    width, height = 512, 512
-    img_array = np.zeros((height, width, 3), dtype=np.float32)
-    
-    # Create a simple gradient
-    for y in range(height):
-        for x in range(width):
-            img_array[y, x] = [
-                x / width,  # Red gradient
-                y / height,  # Green gradient  
-                0.5  # Blue constant
-            ]
-    
-    tensor = torch.from_numpy(img_array).unsqueeze(0)  # Add batch dimension
-    return tensor
+    # Create a simple 512x512 image with a gradient using PIL
+    pil = Image.new("RGB", (512, 512), "gray")
+    return _pil_to_image_tensor(pil)
 
 
 def _load_preset_preview_image(model_id: str, preset_id: str) -> torch.Tensor:
@@ -286,11 +286,8 @@ def _load_preset_preview_image(model_id: str, preset_id: str) -> torch.Tensor:
     
     if os.path.exists(preview_file):
         try:
-            img = Image.open(preview_file).convert("RGB")
-            # Convert to tensor format expected by ComfyUI
-            arr = np.array(img).astype(np.float32) / 255.0
-            tensor = torch.from_numpy(arr).unsqueeze(0)  # Add batch dimension
-            return tensor
+            pil = Image.open(preview_file)
+            return _pil_to_image_tensor(pil)
         except Exception as e:
             print(f"Warning: Could not load preset preview image: {e}")
     
