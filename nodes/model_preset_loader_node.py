@@ -640,6 +640,9 @@ class ModelPresetLoader:
                 # Load preview image for this preset
                 preview_image = _load_preset_preview_image(preset_model_id, preset_id)
                 
+                # Display the image directly in ComfyUI interface
+                comfy.utils.save_images((preview_image.clamp(0,1).cpu().numpy()*255).astype("uint8"))
+                
                 # Return only preview image
                 return (preview_image,)
                         
