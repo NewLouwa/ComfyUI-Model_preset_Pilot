@@ -260,11 +260,25 @@ class ModelPresetManager:
         "STRING",   # preset data as string
         "IMAGE",    # preview image
         "STRING",   # status message
+        "STRING",   # sampler_name for KSampler
+        "STRING",   # scheduler for KSampler
+        "INT",      # steps for KSampler
+        "FLOAT",    # cfg for KSampler
+        "INT",      # width for KSampler
+        "INT",      # height for KSampler
+        "INT",      # seed for KSampler
     )
     RETURN_NAMES = (
         "preset_data",
         "preview_image", 
-        "status"
+        "status",
+        "sampler_name",
+        "scheduler",
+        "steps",
+        "cfg",
+        "width",
+        "height",
+        "seed"
     )
     FUNCTION = "run"
     CATEGORY = "🤖 Model Preset Pilot"
@@ -299,7 +313,8 @@ class ModelPresetManager:
                     if not actual_model_id:
                         print(f"Warning: Could not find model ID for {model_display_name}")
                         default_image = _get_default_preview_image()
-                        return ("Error: Model not found", default_image, "❌ Model not found")
+                        return ("Error: Model not found", default_image, "❌ Model not found",
+                               sampler_name, scheduler, steps, cfg, width, height, seed)
                     
                     # Load the preset data
                     preset_data = get_preset(actual_model_id, preset_id)
@@ -307,7 +322,8 @@ class ModelPresetManager:
                     if not preset_data:
                         print(f"Warning: Could not load preset {preset_id} for model {actual_model_id}")
                         default_image = _get_default_preview_image()
-                        return ("Error: Preset not found", default_image, "❌ Preset not found")
+                        return ("Error: Preset not found", default_image, "❌ Preset not found",
+                               sampler_name, scheduler, steps, cfg, width, height, seed)
                     
                     print(f"Loaded preset '{preset_id}' for model '{model_display_name}'")
                     print(f"Preset data: {preset_data}")
@@ -327,10 +343,22 @@ class ModelPresetManager:
                     except Exception as e:
                         print(f"Warning: Could not display preview image: {e}")
                     
-                    # Return preset data as string and preview image
+                    # Return preset data as string and preview image with KSampler parameters from preset
                     import json
                     preset_json = json.dumps(preset_data, indent=2)
-                    return (preset_json, preview_image, f"✅ Loaded preset: {preset_id}")
+                    
+                    # Extract KSampler parameters from loaded preset
+                    loaded_sampler = preset_data.get("sampler_name", sampler_name)
+                    loaded_scheduler = preset_data.get("scheduler", scheduler)
+                    loaded_steps = preset_data.get("steps", steps)
+                    loaded_cfg = preset_data.get("cfg", cfg)
+                    loaded_width = preset_data.get("width", width)
+                    loaded_height = preset_data.get("height", height)
+                    loaded_seed = preset_data.get("seed", seed)
+                    
+                    return (preset_json, preview_image, f"✅ Loaded preset: {preset_id}",
+                           loaded_sampler, loaded_scheduler, loaded_steps, loaded_cfg, 
+                           loaded_width, loaded_height, loaded_seed)
                             
             except Exception as e:
                 print(f"Warning: Could not load preset '{preset_name}': {e}")
@@ -349,7 +377,8 @@ class ModelPresetManager:
                 except Exception as display_e:
                     print(f"Warning: Could not display error image: {display_e}")
                 
-                return ("Error loading preset", default_image, f"❌ Error: {str(e)}")
+                return ("Error loading preset", default_image, f"❌ Error: {str(e)}",
+                       sampler_name, scheduler, steps, cfg, width, height, seed)
         
         # Handle preset saving
         if save_preset and model_name:
@@ -409,16 +438,18 @@ class ModelPresetManager:
                 status_msg = f"✅ Preset {action}! 📝 Name: {preset_data['name']} 📁 Location: {model_id}/{preset_data['id']} ⚙️ Settings: {sampler_name}, {scheduler}, {steps} steps"
                 print(status_msg)
                 
-                # Return default image and success message
+                # Return default image and success message with KSampler parameters
                 import json
                 default_image = _get_default_preview_image()
-                return (json.dumps(preset_data, indent=2), default_image, status_msg)
+                return (json.dumps(preset_data, indent=2), default_image, status_msg, 
+                       sampler_name, scheduler, steps, cfg, width, height, seed)
                 
             except Exception as e:
                 error_msg = f"❌ Error saving preset: {str(e)}"
                 print(error_msg)
                 default_image = _get_default_preview_image()
-                return ("Error saving preset", default_image, error_msg)
+                return ("Error saving preset", default_image, error_msg, 
+                       sampler_name, scheduler, steps, cfg, width, height, seed)
         
         # No preset selected and not saving
         print("No preset selected and not saving")
@@ -436,7 +467,8 @@ class ModelPresetManager:
         except Exception as display_e:
             print(f"Warning: Could not display default image: {display_e}")
         
-        return ("No preset data", default_image, "📋 Select a preset to load, or 'new_preset' + Save Preset to create")
+        return ("No preset data", default_image, "📋 Select a preset to load, or 'new_preset' + Save Preset to create",
+               sampler_name, scheduler, steps, cfg, width, height, seed)
 
 # Node mappings for ComfyUI
 NODE_CLASS_MAPPINGS = {
