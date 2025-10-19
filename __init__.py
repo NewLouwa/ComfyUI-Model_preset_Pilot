@@ -5,18 +5,18 @@
 try:
     from .nodes.model_preset_manager_node import ModelPresetManager
     from .nodes.preview_image_node import PreviewImage
-    from .nodes.ksampler_helper_node import KSamplerHelper
+    from .nodes.preset_ksampler_node import PresetKSampler
 
     NODE_CLASS_MAPPINGS = {
         "ModelPresetManager": ModelPresetManager,
         "PreviewImage": PreviewImage,
-        "KSamplerHelper": KSamplerHelper,
+        "PresetKSampler": PresetKSampler,
     }
 
     NODE_DISPLAY_NAME_MAPPINGS = {
         "ModelPresetManager": "🎛️ Model Preset Manager",
         "PreviewImage": "🖼️ Preview Image",
-        "KSamplerHelper": "🔧 KSampler Helper",
+        "PresetKSampler": "🎲 Preset KSampler",
     }
 except ImportError:
     # Running outside ComfyUI context
