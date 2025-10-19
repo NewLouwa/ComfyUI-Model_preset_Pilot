@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 import torch
+import numpy as np
 from PIL import Image
 
 import comfy.utils
@@ -20,7 +21,7 @@ import folder_paths
 def _pil_to_image_tensor(pil: Image.Image) -> torch.Tensor:
     """Convert PIL Image to ComfyUI tensor format [1,H,W,C]"""
     img = pil.convert("RGB")
-    arr = comfy.utils.to_uint8(img)  # numpy array uint8
+    arr = np.array(img)  # numpy array uint8
     t = torch.from_numpy(arr).float() / 255.0
     return t.unsqueeze(0)  # batch = 1
 
