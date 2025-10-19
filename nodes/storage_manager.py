@@ -85,8 +85,17 @@ def _get_preset_file(model_id: str, preset_id: str) -> str:
 
 
 def _get_preset_preview_file(model_id: str, preset_id: str) -> str:
-    """Get the preview file path for a specific preset"""
-    return os.path.join(_get_preset_directory(model_id, preset_id), "preview.png")
+    """Get the preview file path for a specific preset - looks for any PNG file in the preset directory"""
+    preset_dir = _get_preset_directory(model_id, preset_id)
+    
+    # Look for any PNG file in the preset directory
+    if os.path.exists(preset_dir):
+        for filename in os.listdir(preset_dir):
+            if filename.lower().endswith('.png'):
+                return os.path.join(preset_dir, filename)
+    
+    # Fallback to preview.png if no PNG found
+    return os.path.join(preset_dir, "preview.png")
 
 
 def _get_model_metadata_file(model_id: str) -> str:
