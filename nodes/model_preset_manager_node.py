@@ -138,6 +138,9 @@ def _get_all_preset_choices():
         print(f"Error loading preset choices: {e}")
         return ["none"]
 
+# Initialize preset choices at module level
+_preset_choices = ["none"]
+
 def _get_default_preview_image() -> torch.Tensor:
     """Get a default preview image when no preset preview is available"""
     return _create_fallback_image()
@@ -198,14 +201,13 @@ class ModelPresetManager:
     
     @classmethod
     def INPUT_TYPES(cls):
-        # Get available presets for the dropdown
-        print("INPUT_TYPES called, getting preset choices...")
-        preset_choices = _get_all_preset_choices()
-        print(f"INPUT_TYPES called, found {len(preset_choices)} choices: {preset_choices}")
+        # Update preset choices dynamically
+        global _preset_choices
+        _preset_choices = _get_all_preset_choices()
         
         return {
             "required": {
-                "preset_name": (preset_choices,),
+                "preset_name": (_preset_choices,),
                 "model_name": (folder_paths.get_filename_list("checkpoints"),),
             },
             "optional": {
