@@ -84,42 +84,25 @@ def _image_tensor_to_pil(t: torch.Tensor) -> Image.Image:
 def _get_all_preset_choices():
     """Get all available presets as choices for the dropdown"""
     try:
-        from .storage_manager import _load_model_database, _get_models_directory
+        # Direct path to presets directory
+        presets_dir = os.path.join(DATA_DIR, "presets", "models")
         
-        # Load model database to get readable names
-        db = _load_model_database()
-        models_dir = _get_models_directory()
+        print(f"Looking for presets directory: {presets_dir}")
         
-        print(f"Looking for models directory: {models_dir}")
-        
-        if not os.path.exists(models_dir):
-            print(f"Models directory does not exist: {models_dir}")
+        if not os.path.exists(presets_dir):
+            print(f"Presets directory does not exist: {presets_dir}")
             return ["none"]
         
         choices = ["none"]
         
-        # Scan models directory
-        print(f"Scanning models directory: {models_dir}")
-        for model_id in os.listdir(models_dir):
-            model_path = os.path.join(models_dir, model_id)
+        # Scan presets directory directly
+        print(f"Scanning presets directory: {presets_dir}")
+        for model_id in os.listdir(presets_dir):
+            model_path = os.path.join(presets_dir, model_id)
             if not os.path.isdir(model_path):
                 continue
                 
-            # Get display name from database
-            display_name = model_id
-            if "models" in db:
-                for mid, model_entry in db["models"].items():
-                    if mid == model_id:
-                        checkpoint_name = model_entry.get("checkpoint_name", "")
-                        if checkpoint_name:
-                            # Extract filename without path and extension
-                            import os
-                            base_name = os.path.splitext(os.path.basename(checkpoint_name))[0]
-                            display_name = base_name
-                        break
-            
             print(f"Checking model: {model_id}")
-            print(f"Display name: {display_name}")
             
             # Scan presets for this model
             for preset_id in os.listdir(model_path):
@@ -128,7 +111,7 @@ def _get_all_preset_choices():
                     # Check if preset.json exists
                     preset_file = os.path.join(preset_path, "preset.json")
                     if os.path.exists(preset_file):
-                        choice = f"{display_name}/{preset_id}"
+                        choice = f"{model_id}/{preset_id}"
                         choices.append(choice)
                         print(f"Found preset: {choice}")
         
