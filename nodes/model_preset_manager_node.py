@@ -198,6 +198,7 @@ class ModelPresetManager:
             },
             "optional": {
                 "save_preset": ("BOOLEAN", {"default": False}),
+                "new_preset_name": ("STRING", {"default": ""}),
                 "sampler_name": ("STRING", {"default": "euler"}),
                 "scheduler": ("STRING", {"default": "normal"}),
                 "steps": ("INT", {"default": 28, "min": 1, "max": 100}),
@@ -222,7 +223,7 @@ class ModelPresetManager:
     FUNCTION = "run"
     CATEGORY = "🤖 Model Preset Pilot"
 
-    def run(self, preset_name="none", model_name="", save_preset=False, 
+    def run(self, preset_name="none", model_name="", save_preset=False, new_preset_name="",
             sampler_name="euler", scheduler="normal", steps=28, cfg=5.5,
             clip_skip=0, width=1024, height=1024, seed=0, unique_id=None, extra_pnginfo=None):
         
@@ -312,9 +313,12 @@ class ModelPresetManager:
                 model_id = os.path.splitext(os.path.basename(model_name))[0]
                 
                 # Create preset data
+                preset_id = new_preset_name if new_preset_name else f"preset_{int(datetime.now().timestamp())}"
+                preset_display_name = new_preset_name if new_preset_name else f"Preset for {model_id}"
+                
                 preset_data = {
-                    "id": f"preset_{int(datetime.now().timestamp())}",
-                    "name": f"Preset for {model_id}",
+                    "id": preset_id,
+                    "name": preset_display_name,
                     "description": f"Preset created for {model_id}",
                     "sampler_name": sampler_name,
                     "scheduler": scheduler,
