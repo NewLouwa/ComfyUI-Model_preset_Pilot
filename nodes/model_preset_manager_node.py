@@ -19,129 +19,58 @@ import nodes
 import folder_paths
 from .storage_manager import create_preset, get_preset, get_all_presets, save_preview_image, load_preview_image
 
-# Get available samplers/schedulers from installed ComfyUI nodes (smart approach)
+# Get available samplers/schedulers from ComfyUI core (source of truth)
 def _get_sampler_choices():
-    """Get available samplers from installed ComfyUI nodes"""
+    """Get available samplers from comfy.samplers (source of truth)"""
     try:
-        import nodes
-        samplers = set()
+        import comfy.samplers as comfy_samplers
         
-        # Priority nodes to check first (most common sampler sources)
-        priority_nodes = [
-            "KSampler", "KSamplerAdvanced", "SamplerCustom", "SamplerEulerAncestral",
-            "SamplerLMS", "SamplerDPMSDE", "SamplerDPMFast", "SamplerDPMAdaptive",
-            "SamplerUniPC", "SamplerDDIM", "SamplerDDPM"
-        ]
+        # Get the global registry of registered samplers
+        samplers = getattr(comfy_samplers, "SAMPLERS", [])
         
-        # Check priority nodes first
-        for node_name in priority_nodes:
-            if hasattr(nodes, node_name):
-                node_class = getattr(nodes, node_name)
-                if hasattr(node_class, 'SAMPLERS'):
-                    samplers.update(node_class.SAMPLERS)
-                elif hasattr(node_class, 'INPUT_TYPES'):
-                    input_types = node_class.INPUT_TYPES()
-                    if isinstance(input_types, dict):
-                        for input_name, input_config in input_types.get("required", {}).items():
-                            if "sampler" in input_name.lower() and isinstance(input_config, (list, tuple)):
-                                if len(input_config) > 0 and isinstance(input_config[0], list):
-                                    samplers.update(input_config[0])
+        # Remove None/empty values and duplicates
+        samplers = [s for s in samplers if s]
+        samplers = sorted(set(samplers))
         
-        # If we found samplers, return them
-        if samplers:
-            sampler_list = sorted(list(samplers))
-            print(f"Found {len(sampler_list)} samplers from installed nodes")
-            return sampler_list
+        # Optional: verify samplers are actually available in the lookup
+        registered = getattr(comfy_samplers, "SAMPLER_LOOKUP", {})
+        valid_samplers = [s for s in samplers if s in registered and callable(registered.get(s))]
         
-        # Fallback: scan a few more common nodes (limited scan)
-        common_nodes = ["KSampler", "KSamplerAdvanced", "SamplerCustom"]
-        for node_name in common_nodes:
-            if hasattr(nodes, node_name):
-                try:
-                    node_class = getattr(nodes, node_name)
-                    if hasattr(node_class, 'INPUT_TYPES'):
-                        input_types = node_class.INPUT_TYPES()
-                        if isinstance(input_types, dict):
-                            for input_name, input_config in input_types.get("required", {}).items():
-                                if "sampler" in input_name.lower() and isinstance(input_config, (list, tuple)):
-                                    if len(input_config) > 0 and isinstance(input_config[0], list):
-                                        samplers.update(input_config[0])
-                except:
-                    continue
-        
-        if samplers:
-            sampler_list = sorted(list(samplers))
-            print(f"Found {len(sampler_list)} samplers from extended scan")
-            return sampler_list
-        
-        # Final fallback
-        print("Using fallback sampler list")
-        return ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde", "ddim", "ddpm"]
-        
+        if valid_samplers:
+            print(f"[ModelPresetPilot] Found {len(valid_samplers)} valid samplers from comfy.samplers")
+            return valid_samplers
+        elif samplers:
+            print(f"[ModelPresetPilot] Found {len(samplers)} samplers from comfy.samplers (not all verified)")
+            return samplers
+        else:
+            print("[ModelPresetPilot] No samplers found in comfy.samplers, using fallback")
+            return ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
+            
     except Exception as e:
-        print(f"Error getting samplers: {e}")
+        print(f"[ModelPresetPilot] Error detecting samplers: {e}")
         return ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
 
 def _get_scheduler_choices():
-    """Get available schedulers from installed ComfyUI nodes"""
+    """Get available schedulers from comfy.samplers (source of truth)"""
     try:
-        import nodes
-        schedulers = set()
+        import comfy.samplers as comfy_samplers
         
-        # Priority nodes to check first (most common scheduler sources)
-        priority_nodes = [
-            "KSampler", "KSamplerAdvanced", "SamplerCustom", "SamplerEulerAncestral",
-            "SamplerLMS", "SamplerDPMSDE", "SamplerDPMFast", "SamplerDPMAdaptive",
-            "SamplerUniPC", "SamplerDDIM", "SamplerDDPM"
-        ]
+        # Get the global registry of registered schedulers
+        schedulers = getattr(comfy_samplers, "SCHEDULERS", [])
         
-        # Check priority nodes first
-        for node_name in priority_nodes:
-            if hasattr(nodes, node_name):
-                node_class = getattr(nodes, node_name)
-                if hasattr(node_class, 'SCHEDULERS'):
-                    schedulers.update(node_class.SCHEDULERS)
-                elif hasattr(node_class, 'INPUT_TYPES'):
-                    input_types = node_class.INPUT_TYPES()
-                    if isinstance(input_types, dict):
-                        for input_name, input_config in input_types.get("required", {}).items():
-                            if "scheduler" in input_name.lower() and isinstance(input_config, (list, tuple)):
-                                if len(input_config) > 0 and isinstance(input_config[0], list):
-                                    schedulers.update(input_config[0])
-        
-        # If we found schedulers, return them
-        if schedulers:
-            scheduler_list = sorted(list(schedulers))
-            print(f"Found {len(scheduler_list)} schedulers from installed nodes")
-            return scheduler_list
-        
-        # Fallback: scan a few more common nodes (limited scan)
-        common_nodes = ["KSampler", "KSamplerAdvanced", "SamplerCustom"]
-        for node_name in common_nodes:
-            if hasattr(nodes, node_name):
-                try:
-                    node_class = getattr(nodes, node_name)
-                    if hasattr(node_class, 'INPUT_TYPES'):
-                        input_types = node_class.INPUT_TYPES()
-                        if isinstance(input_types, dict):
-                            for input_name, input_config in input_types.get("required", {}).items():
-                                if "scheduler" in input_name.lower() and isinstance(input_config, (list, tuple)):
-                                    if len(input_config) > 0 and isinstance(input_config[0], list):
-                                        schedulers.update(input_config[0])
-                except:
-                    continue
+        # Remove None/empty values and duplicates
+        schedulers = [s for s in schedulers if s]
+        schedulers = sorted(set(schedulers))
         
         if schedulers:
-            scheduler_list = sorted(list(schedulers))
-            print(f"Found {len(scheduler_list)} schedulers from extended scan")
-            return scheduler_list
-        
-        # Final fallback
-        print("Using fallback scheduler list")
-        return ["normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform"]
-        
+            print(f"[ModelPresetPilot] Found {len(schedulers)} schedulers from comfy.samplers")
+            return schedulers
+        else:
+            print("[ModelPresetPilot] No schedulers found in comfy.samplers, using fallback")
+            return ["normal", "karras", "exponential", "sgm_uniform"]
+            
     except Exception as e:
-        print(f"Error getting schedulers: {e}")
+        print(f"[ModelPresetPilot] Error detecting schedulers: {e}")
         return ["normal", "karras", "exponential", "sgm_uniform"]
 
 # Data directory for default assets and templates
