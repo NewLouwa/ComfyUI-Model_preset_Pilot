@@ -578,11 +578,9 @@ class ModelPresetLoader:
     
 
     RETURN_TYPES = (
-        "STRING",   # preset data as string
         "IMAGE",    # preview image
     )
     RETURN_NAMES = (
-        "preset_data",
         "preview_image"
     )
     FUNCTION = "run"
@@ -621,16 +619,16 @@ class ModelPresetLoader:
                     
                     if actual_model_id is None:
                         print(f"Could not find model for: {model_name}")
-                        # Return default image and error message
+                        # Return default image
                         default_image = _get_default_preview_image()
-                        return ("No preset data", default_image)
+                        return (default_image,)
                     
                     preset_model_id = actual_model_id
                 else:
                     print(f"Invalid preset format: {preset_name}")
-                    # Return default image and error message
+                    # Return default image
                     default_image = _get_default_preview_image()
-                    return ("No preset data", default_image)
+                    return (default_image,)
                 
                 # Import storage manager functions
                 from .storage_manager import get_preset
@@ -642,19 +640,17 @@ class ModelPresetLoader:
                 # Load preview image for this preset
                 preview_image = _load_preset_preview_image(preset_model_id, preset_id)
                 
-                # Return preset data as string and preview image
-                import json
-                preset_json = json.dumps(preset_data, indent=2)
-                return (preset_json, preview_image)
+                # Return only preview image
+                return (preview_image,)
                         
             except Exception as e:
                 print(f"Warning: Could not load preset '{preset_name}': {e}")
-                # Return default image and error message
+                # Return default image
                 default_image = _get_default_preview_image()
-                return ("Error loading preset", default_image)
+                return (default_image,)
         else:
             print("No preset selected")
-            # Return default image and no data message
+            # Return default image
             default_image = _get_default_preview_image()
-            return ("No preset data", default_image)
+            return (default_image,)
     
