@@ -90,12 +90,16 @@ def _get_all_preset_choices():
         db = _load_model_database()
         models_dir = _get_models_directory()
         
+        print(f"Looking for models directory: {models_dir}")
+        
         if not os.path.exists(models_dir):
+            print(f"Models directory does not exist: {models_dir}")
             return ["none"]
         
         choices = ["none"]
         
         # Scan models directory
+        print(f"Scanning models directory: {models_dir}")
         for model_id in os.listdir(models_dir):
             model_path = os.path.join(models_dir, model_id)
             if not os.path.isdir(model_path):
@@ -114,6 +118,9 @@ def _get_all_preset_choices():
                             display_name = base_name
                         break
             
+            print(f"Checking model: {model_id}")
+            print(f"Display name: {display_name}")
+            
             # Scan presets for this model
             for preset_id in os.listdir(model_path):
                 preset_path = os.path.join(model_path, preset_id)
@@ -121,8 +128,11 @@ def _get_all_preset_choices():
                     # Check if preset.json exists
                     preset_file = os.path.join(preset_path, "preset.json")
                     if os.path.exists(preset_file):
-                        choices.append(f"{display_name}/{preset_id}")
+                        choice = f"{display_name}/{preset_id}"
+                        choices.append(choice)
+                        print(f"Found preset: {choice}")
         
+        print(f"Total preset choices: {choices}")
         return choices
     except Exception as e:
         print(f"Error loading preset choices: {e}")
@@ -189,7 +199,9 @@ class ModelPresetManager:
     @classmethod
     def INPUT_TYPES(cls):
         # Get available presets for the dropdown
+        print("INPUT_TYPES called, getting preset choices...")
         preset_choices = _get_all_preset_choices()
+        print(f"INPUT_TYPES called, found {len(preset_choices)} choices: {preset_choices}")
         
         return {
             "required": {
@@ -198,7 +210,7 @@ class ModelPresetManager:
             },
             "optional": {
                 "save_preset": ("BOOLEAN", {"default": False}),
-                "new_preset_name": ("STRING", {"default": ""}),
+                "new_preset_name": ("STRING", {"default": "preset_XXX"}),
                 "sampler_name": ("STRING", {"default": "euler"}),
                 "scheduler": ("STRING", {"default": "normal"}),
                 "steps": ("INT", {"default": 28, "min": 1, "max": 100}),
