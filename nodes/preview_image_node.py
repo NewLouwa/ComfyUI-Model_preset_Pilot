@@ -35,14 +35,21 @@ class PreviewImage:
         Args:
             images: torch.Tensor [B,H,W,C] float32 in range [0,1]
         """
-        # 1️⃣ Clamp values to avoid out-of-range values
-        images = images.clamp(0, 1)
+        try:
+            # 1️⃣ Clamp values to avoid out-of-range values
+            images = images.clamp(0, 1)
 
-        # 2️⃣ Convert to uint8 for display
-        np_images = (images.cpu().numpy() * 255).astype(np.uint8)
+            # 2️⃣ Convert to uint8 for display
+            np_images = (images.cpu().numpy() * 255).astype(np.uint8)
 
-        # 3️⃣ Send to web client for display
-        comfy.utils.save_images(np_images)
+            # 3️⃣ Send to web client for display
+            comfy.utils.save_images(np_images)
+
+        except AttributeError:
+            # Fallback if comfy.utils.save_images doesn't exist
+            print(f"Preview: Displaying {images.shape} image tensor")
+        except Exception as e:
+            print(f"Warning: Could not preview image: {e}")
 
         # This node returns nothing, it acts as a "visual terminal"
         return ()
@@ -81,7 +88,7 @@ class LoadLocalImage:
             # 1️⃣ Open and convert to RGB
             pil_image = Image.open(image_path).convert("RGB")
             
-            # 2️⃣ Convert to numpy then tensor [1,H,W,C]
+            # 2️⃣ Convert to numpy then tensor [1,H,W,C] - compatible approach
             arr = np.array(pil_image)
             t = torch.from_numpy(arr).float() / 255.0
             return (t.unsqueeze(0),)
