@@ -19,40 +19,127 @@ import nodes
 import folder_paths
 from .storage_manager import create_preset, get_preset, get_all_presets, save_preview_image, load_preview_image
 
-# Get available samplers/schedulers from ComfyUI (fast approach)
+# Get available samplers/schedulers from installed ComfyUI nodes (smart approach)
 def _get_sampler_choices():
-    """Get available samplers from ComfyUI KSampler"""
+    """Get available samplers from installed ComfyUI nodes"""
     try:
-        from nodes import KSampler
-        if hasattr(KSampler, "SAMPLERS"):
-            return KSampler.SAMPLERS
-        else:
-            # Extended list of common samplers
-            return [
-                "euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde", 
-                "dpmpp_2m_sde", "dpmpp_2m_sde_gpu", "dpmpp_2m_sde_karras", "dpmpp_2m_sde_exponential",
-                "dpmpp_sde_gpu", "dpmpp_sde_karras", "dpmpp_sde_exponential", "dpmpp_2m_ancestral",
-                "dpmpp_2m_karras", "dpmpp_2m_exponential", "dpmpp_2m_sgm_uniform", "dpmpp_2m_sde_sgm_uniform",
-                "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "dpmpp_3m_sde_karras", "dpmpp_3m_sde_exponential",
-                "dpmpp_3m_sde_sgm_uniform", "ddim", "ddpm", "uni_pc", "uni_pc_bh2", "uni_pc_bh1",
-                "uni_pc_bh2_sde", "uni_pc_bh1_sde", "uni_pc_bh2_sde_karras", "uni_pc_bh1_sde_karras"
-            ]
+        import nodes
+        samplers = set()
+        
+        # Priority nodes to check first (most common sampler sources)
+        priority_nodes = [
+            "KSampler", "KSamplerAdvanced", "SamplerCustom", "SamplerEulerAncestral",
+            "SamplerLMS", "SamplerDPMSDE", "SamplerDPMFast", "SamplerDPMAdaptive",
+            "SamplerUniPC", "SamplerDDIM", "SamplerDDPM"
+        ]
+        
+        # Check priority nodes first
+        for node_name in priority_nodes:
+            if hasattr(nodes, node_name):
+                node_class = getattr(nodes, node_name)
+                if hasattr(node_class, 'SAMPLERS'):
+                    samplers.update(node_class.SAMPLERS)
+                elif hasattr(node_class, 'INPUT_TYPES'):
+                    input_types = node_class.INPUT_TYPES()
+                    if isinstance(input_types, dict):
+                        for input_name, input_config in input_types.get("required", {}).items():
+                            if "sampler" in input_name.lower() and isinstance(input_config, (list, tuple)):
+                                if len(input_config) > 0 and isinstance(input_config[0], list):
+                                    samplers.update(input_config[0])
+        
+        # If we found samplers, return them
+        if samplers:
+            sampler_list = sorted(list(samplers))
+            print(f"Found {len(sampler_list)} samplers from installed nodes")
+            return sampler_list
+        
+        # Fallback: scan a few more common nodes (limited scan)
+        common_nodes = ["KSampler", "KSamplerAdvanced", "SamplerCustom"]
+        for node_name in common_nodes:
+            if hasattr(nodes, node_name):
+                try:
+                    node_class = getattr(nodes, node_name)
+                    if hasattr(node_class, 'INPUT_TYPES'):
+                        input_types = node_class.INPUT_TYPES()
+                        if isinstance(input_types, dict):
+                            for input_name, input_config in input_types.get("required", {}).items():
+                                if "sampler" in input_name.lower() and isinstance(input_config, (list, tuple)):
+                                    if len(input_config) > 0 and isinstance(input_config[0], list):
+                                        samplers.update(input_config[0])
+                except:
+                    continue
+        
+        if samplers:
+            sampler_list = sorted(list(samplers))
+            print(f"Found {len(sampler_list)} samplers from extended scan")
+            return sampler_list
+        
+        # Final fallback
+        print("Using fallback sampler list")
+        return ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde", "ddim", "ddpm"]
+        
     except Exception as e:
         print(f"Error getting samplers: {e}")
         return ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
 
 def _get_scheduler_choices():
-    """Get available schedulers from ComfyUI KSampler"""
+    """Get available schedulers from installed ComfyUI nodes"""
     try:
-        from nodes import KSampler
-        if hasattr(KSampler, "SCHEDULERS"):
-            return KSampler.SCHEDULERS
-        else:
-            # Extended list of common schedulers
-            return [
-                "normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform",
-                "lcm", "turbo", "align_your_steps", "tcd", "edm_playground_v2.5", "peft"
-            ]
+        import nodes
+        schedulers = set()
+        
+        # Priority nodes to check first (most common scheduler sources)
+        priority_nodes = [
+            "KSampler", "KSamplerAdvanced", "SamplerCustom", "SamplerEulerAncestral",
+            "SamplerLMS", "SamplerDPMSDE", "SamplerDPMFast", "SamplerDPMAdaptive",
+            "SamplerUniPC", "SamplerDDIM", "SamplerDDPM"
+        ]
+        
+        # Check priority nodes first
+        for node_name in priority_nodes:
+            if hasattr(nodes, node_name):
+                node_class = getattr(nodes, node_name)
+                if hasattr(node_class, 'SCHEDULERS'):
+                    schedulers.update(node_class.SCHEDULERS)
+                elif hasattr(node_class, 'INPUT_TYPES'):
+                    input_types = node_class.INPUT_TYPES()
+                    if isinstance(input_types, dict):
+                        for input_name, input_config in input_types.get("required", {}).items():
+                            if "scheduler" in input_name.lower() and isinstance(input_config, (list, tuple)):
+                                if len(input_config) > 0 and isinstance(input_config[0], list):
+                                    schedulers.update(input_config[0])
+        
+        # If we found schedulers, return them
+        if schedulers:
+            scheduler_list = sorted(list(schedulers))
+            print(f"Found {len(scheduler_list)} schedulers from installed nodes")
+            return scheduler_list
+        
+        # Fallback: scan a few more common nodes (limited scan)
+        common_nodes = ["KSampler", "KSamplerAdvanced", "SamplerCustom"]
+        for node_name in common_nodes:
+            if hasattr(nodes, node_name):
+                try:
+                    node_class = getattr(nodes, node_name)
+                    if hasattr(node_class, 'INPUT_TYPES'):
+                        input_types = node_class.INPUT_TYPES()
+                        if isinstance(input_types, dict):
+                            for input_name, input_config in input_types.get("required", {}).items():
+                                if "scheduler" in input_name.lower() and isinstance(input_config, (list, tuple)):
+                                    if len(input_config) > 0 and isinstance(input_config[0], list):
+                                        schedulers.update(input_config[0])
+                except:
+                    continue
+        
+        if schedulers:
+            scheduler_list = sorted(list(schedulers))
+            print(f"Found {len(scheduler_list)} schedulers from extended scan")
+            return scheduler_list
+        
+        # Final fallback
+        print("Using fallback scheduler list")
+        return ["normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform"]
+        
     except Exception as e:
         print(f"Error getting schedulers: {e}")
         return ["normal", "karras", "exponential", "sgm_uniform"]
