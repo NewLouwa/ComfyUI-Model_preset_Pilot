@@ -137,6 +137,13 @@ temp/
 *.bin
 *.safetensors.index.json
 
+# Project specific
+data/presets/models/
+data/model_database.json
+data/presets/index.json
+logs/
+.cursor/
+
 # IDE
 .vscode/
 .idea/
