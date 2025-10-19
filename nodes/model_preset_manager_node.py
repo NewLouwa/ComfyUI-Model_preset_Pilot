@@ -361,6 +361,7 @@ class ModelPresetManager:
                 print(status_msg)
                 
                 # Return default image and success message
+                import json
                 default_image = _get_default_preview_image()
                 return (json.dumps(preset_data, indent=2), default_image, status_msg)
                 
