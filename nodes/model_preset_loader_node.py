@@ -7,6 +7,7 @@ import hashlib
 import shutil
 import base64
 import mimetypes
+from datetime import datetime
 from typing import Any, Dict, Optional, List, Tuple
 
 import torch
@@ -34,9 +35,13 @@ except Exception:
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 DEFAULTS_DIR = os.path.join(DATA_DIR, "defaults")
 ASSETS_DIR = os.path.join(DATA_DIR, "assets")
+PRESET_DIR = os.path.join(DATA_DIR, "presets")
+PREVIEW_DIR = os.path.join(DATA_DIR, "previews")
 
 os.makedirs(DEFAULTS_DIR, exist_ok=True)
 os.makedirs(ASSETS_DIR, exist_ok=True)
+os.makedirs(PRESET_DIR, exist_ok=True)
+os.makedirs(PREVIEW_DIR, exist_ok=True)
 
 # Register our custom API endpoint for file uploads
 def api_load_preview_image(json_data):
@@ -107,19 +112,91 @@ def _model_identifier(model: Optional[Any], ckpt_name: Optional[str]) -> str:
     """
     Build a stable identifier for the model to name files.
     Priority:
-        1) model.model_name if present (or inner model_name/ckpt_path)
-        2) ckpt_name string
-        3) hashed fallback
+        1) Try to get model name from ComfyUI's model loading system
+        2) model.model_name if present (or inner model_name/ckpt_path)
+        3) ckpt_name string
+        4) Try to extract filename from model object attributes
+        5) hashed fallback
     """
     if model is not None:
-        name = getattr(model, "model_name", None)
+        # First, try to get the model name from ComfyUI's model loading system
+        try:
+            # Check if we can get the model name from the model's internal structure
+            if hasattr(model, 'model') and hasattr(model.model, '__class__'):
+                model_class_name = model.model.__class__.__name__
+                
+                # Try to get the model name from the model's config or state
+                if hasattr(model.model, 'config') and hasattr(model.model.config, 'name'):
+                    name = model.model.config.name
+                elif hasattr(model.model, 'name'):
+                    name = model.model.name
+                else:
+                    name = None
+        except Exception:
+            name = None
+        
+        # Try model.model_name first
         if not name:
+            name = getattr(model, "model_name", None)
+        
+        if not name:
+            # Try inner model attributes
             inner = getattr(model, "model", None)
-            name = getattr(inner, "model_name", None) or getattr(inner, "ckpt_path", None)
+            if inner:
+                name = getattr(inner, "model_name", None) or getattr(inner, "ckpt_path", None)
+        
+        # If still no name, try other common attributes
+        if not name:
+            # Try common model attributes that might contain filename
+            for attr in ["filename", "file_name", "path", "ckpt_path", "name", "config_path"]:
+                if hasattr(model, attr):
+                    attr_value = getattr(model, attr)
+                    # Skip methods and None values, only use strings
+                    if attr_value and str(attr_value) != "None" and not callable(attr_value) and isinstance(attr_value, str):
+                        name = attr_value
+                        break
+                # Also check inner model
+                if inner and hasattr(inner, attr):
+                    attr_value = getattr(inner, attr)
+                    if attr_value and str(attr_value) != "None" and not callable(attr_value) and isinstance(attr_value, str):
+                        name = attr_value
+                        break
+        
+        # If we found a name, extract just the filename without extension
         if name:
-            return _sanitize_filename(str(name))
+            name_str = str(name)
+            # Extract filename from path if it's a full path
+            if "/" in name_str or "\\" in name_str:
+                name_str = os.path.basename(name_str)
+            # Remove extension
+            name_str = os.path.splitext(name_str)[0]
+            return _sanitize_filename(name_str)
+    
     if ckpt_name:
         return _sanitize_filename(str(ckpt_name))
+    
+    # Use a more stable hash based on model structure rather than object repr
+    try:
+        if model is not None:
+            # Try to create a stable hash based on model structure
+            model_info = {
+                'type': str(type(model)),
+                'class': str(model.__class__.__name__) if hasattr(model, '__class__') else 'unknown'
+            }
+            
+            # Add inner model info if available
+            if hasattr(model, 'model') and model.model is not None:
+                model_info['inner_type'] = str(type(model.model))
+                if hasattr(model.model, '__class__'):
+                    model_info['inner_class'] = str(model.model.__class__.__name__)
+            
+            # Create hash from stable model info
+            model_str = str(sorted(model_info.items()))
+            stable_hash = hashlib.sha256(model_str.encode()).hexdigest()[:10]
+            return f"model_{stable_hash}"
+    except Exception:
+        pass
+    
     return f"unknown_{hashlib.sha256(repr(model).encode()).hexdigest()[:10]}"
 
 
@@ -225,11 +302,10 @@ class ModelPresetLoader:
     
     @classmethod
     def IS_CHANGED(cls, **kwargs):
-        return float("NaN")  # Always update to handle button clicks
+        # Force update to refresh preset choices
+        return float("NaN")  # Always update
     
-    @classmethod
-    def VALIDATE_INPUTS(cls, **kwargs):
-        return True
+    
         
     @classmethod
     def get_js(cls):
@@ -244,11 +320,11 @@ class ModelPresetLoader:
             textDisplay.style.top = "60px";
             textDisplay.style.left = "10px";
             textDisplay.style.right = "10px";
-            textDisplay.style.height = "80px";
-            textDisplay.style.padding = "8px";
+            textDisplay.style.height = "50px";
+            textDisplay.style.padding = "6px";
             textDisplay.style.backgroundColor = "rgba(0,0,0,0.7)";
             textDisplay.style.borderRadius = "4px";
-            textDisplay.style.fontSize = "11px";
+            textDisplay.style.fontSize = "10px";
             textDisplay.style.fontFamily = "monospace";
             textDisplay.style.color = "#ccc";
             textDisplay.style.border = "1px solid #444";
@@ -256,18 +332,18 @@ class ModelPresetLoader:
             textDisplay.style.display = "flex";
             textDisplay.style.alignItems = "center";
             textDisplay.style.justifyContent = "center";
-            textDisplay.innerHTML = "Model: Not connected<br>ID: Unknown";
+            textDisplay.innerHTML = "Model: Not connected<br>ID: Unknown<br>Presets: 0 available";
             
             // Create image preview canvas (positioned at bottom)
             const previewCanvas = document.createElement("canvas");
-            previewCanvas.width = 150;
-            previewCanvas.height = 150;
+            previewCanvas.width = 120;
+            previewCanvas.height = 120;
             previewCanvas.style.position = "absolute";
             previewCanvas.style.bottom = "10px";
             previewCanvas.style.left = "10px";
             previewCanvas.style.right = "10px";
             previewCanvas.style.border = "2px solid #333";
-            previewCanvas.style.borderRadius = "8px";
+            previewCanvas.style.borderRadius = "6px";
             previewCanvas.style.backgroundColor = "#1a1a1a";
             previewCanvas.style.display = "block";
             previewCanvas.style.margin = "0 auto";
@@ -275,7 +351,7 @@ class ModelPresetLoader:
             // Add elements to the node
             const nodeContainer = node.widgets[0].options.el.parentElement.parentElement;
             nodeContainer.style.position = "relative";
-            nodeContainer.style.minHeight = "300px";
+            nodeContainer.style.minHeight = "250px";
             nodeContainer.appendChild(textDisplay);
             nodeContainer.appendChild(previewCanvas);
             
@@ -284,29 +360,42 @@ class ModelPresetLoader:
                 const ctx = previewCanvas.getContext("2d");
                 
                 // Create a default preview image with gradient background
-                const gradient = ctx.createLinearGradient(0, 0, 150, 150);
+                const gradient = ctx.createLinearGradient(0, 0, 120, 120);
                 gradient.addColorStop(0, "#2a2a2a");
                 gradient.addColorStop(1, "#1a1a1a");
                 ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, 150, 150);
+                ctx.fillRect(0, 0, 120, 120);
                 
                 // Add border
                 ctx.strokeStyle = "#444";
                 ctx.lineWidth = 2;
-                ctx.strokeRect(1, 1, 148, 148);
+                ctx.strokeRect(1, 1, 118, 118);
                 
                 // Add default preview icon
                 ctx.fillStyle = "#666";
-                ctx.font = "bold 14px Arial";
+                ctx.font = "bold 12px Arial";
                 ctx.textAlign = "center";
-                ctx.fillText("🖼️", 75, 70);
-                ctx.font = "10px Arial";
-                ctx.fillText("Preview", 75, 90);
-                ctx.fillText("Image", 75, 105);
+                ctx.fillText("🖼️", 60, 55);
+                ctx.font = "9px Arial";
+                ctx.fillText("Preview", 60, 75);
+                ctx.fillText("Image", 60, 90);
+            }
+            
+            // Function to update preset choices dynamically
+            function updatePresetChoices() {
+                // Find the preset_name widget and update its choices
+                const presetWidget = node.widgets.find(w => w.name === "preset_name");
+                if (presetWidget && presetWidget.options) {
+                    // This will be handled by the backend when the model changes
+                    console.log("Preset choices will be updated by backend");
+                }
             }
             
             // Initialize display
             updateDisplay();
+            
+            // Store functions on the node for external access
+            node.updatePresetChoices = updatePresetChoices;
         }
         
         // Register a callback when nodes are added to the graph
@@ -324,105 +413,173 @@ class ModelPresetLoader:
 
     @classmethod
     def INPUT_TYPES(cls):
+        # Force refresh of preset choices every time
+        preset_choices = cls._get_all_preset_choices()
+        print(f"INPUT_TYPES called, found {len(preset_choices)} choices: {preset_choices}")
+        
         return {
             "required": {
-                "model": ("MODEL",),
-            },
-            "optional": {
-                "image": ("IMAGE",),
+                "preset_name": (preset_choices,),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
                 "extra_pnginfo": "EXTRA_PNGINFO",
             }
         }
+    
+    @classmethod
+    def _get_all_preset_choices(cls):
+        """Get all available presets across all models, formatted as model_name/preset_name"""
+        preset_choices = ["none"]
+        
+        try:
+            # Use absolute path to ensure we find the directory
+            models_dir = os.path.abspath(os.path.join(PRESET_DIR, "models"))
+            print(f"Looking for models directory: {models_dir}")
+            
+            if not os.path.exists(models_dir):
+                print(f"Models directory not found: {models_dir}")
+                # Try alternative path
+                alt_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "presets", "models"))
+                print(f"Trying alternative path: {alt_path}")
+                if os.path.exists(alt_path):
+                    models_dir = alt_path
+                else:
+                    return preset_choices
+            
+            print(f"Scanning models directory: {models_dir}")
+            
+            # Load model database for better names
+            from .storage_manager import _load_model_database
+            db = _load_model_database()
+            print(f"Model database loaded: {len(db.get('models', {}))} models")
+            
+            # Scan all model directories
+            for model_id in os.listdir(models_dir):
+                model_dir = os.path.join(models_dir, model_id)
+                if not os.path.isdir(model_dir):
+                    continue
+                
+                print(f"Checking model: {model_id}")
+                
+                # Get a better display name for the model
+                model_entry = db.get("models", {}).get(model_id, {})
+                display_name = model_entry.get("checkpoint_name", model_id)
+                
+                # If we have a checkpoint_name, use the filename without path
+                if display_name and display_name != model_id:
+                    # Extract just the filename from the full path
+                    display_name = os.path.basename(display_name)
+                    # Remove extension
+                    display_name = os.path.splitext(display_name)[0]
+                
+                # If it's still a hash, try to make it more readable
+                if display_name.startswith("model_") or display_name.startswith("unknown_"):
+                    # Try to extract type from model_id or use a generic name
+                    if "SDXL" in model_id.upper():
+                        display_name = "SDXL_Model"
+                    elif "SD" in model_id.upper():
+                        display_name = "SD_Model"
+                    elif "FLUX" in model_id.upper():
+                        display_name = "FLUX_Model"
+                    elif "PONY" in model_id.upper():
+                        display_name = "PONY_Model"
+                    elif "ILLUST" in model_id.upper():
+                        display_name = "ILLUST_Model"
+                    else:
+                        display_name = f"Model_{model_id[-8:]}"  # Use last 8 chars of hash
+                
+                print(f"Display name: {display_name}")
+                
+                # Scan all presets for this model
+                preset_count = 0
+                for preset_name in os.listdir(model_dir):
+                    preset_path = os.path.join(model_dir, preset_name)
+                    if os.path.isdir(preset_path):
+                        # Check if it's a valid preset directory (has preset.json)
+                        preset_file = os.path.join(preset_path, "preset.json")
+                        if os.path.exists(preset_file):
+                            # Format: "display_name/preset_name"
+                            preset_choices.append(f"{display_name}/{preset_name}")
+                            preset_count += 1
+                            print(f"Found preset: {display_name}/{preset_name}")
+                
+                print(f"Found {preset_count} presets for {display_name}")
+            
+            print(f"Total preset choices: {preset_choices}")
+            return preset_choices if len(preset_choices) > 1 else ["none"]
+        except Exception as e:
+            print(f"Warning: Could not get preset choices: {e}")
+            import traceback
+            traceback.print_exc()
+            return ["none"]
+    
 
     RETURN_TYPES = (
-        "MODEL",    # model (pass through)
-        "IMAGE",    # preview image
-        "STRING",   # model_info (text display)
+        "STRING",   # preset data as string
     )
     RETURN_NAMES = (
-        "model", "preview", "model_info"
+        "preset_data"
     )
     FUNCTION = "run"
     CATEGORY = "🤖 Model Preset Pilot"
 
-    def _empty_image(self):
-        return torch.zeros((1, 1, 1, 3), dtype=torch.float32)
-    
-    def _create_default_preview(self, width=150, height=150):
-        """Create a default preview image with a nice gradient and icon"""
-        # Create a gradient background
-        img = Image.new('RGB', (width, height), '#1a1a1a')
         
-        # Create a simple default preview with text
-        from PIL import ImageDraw, ImageFont
-        draw = ImageDraw.Draw(img)
-        
-        # Add gradient effect
-        for y in range(height):
-            alpha = int(255 * (1 - y / height))
-            color = (int(26 + alpha * 0.1), int(26 + alpha * 0.1), int(26 + alpha * 0.1))
-            draw.line([(0, y), (width, y)], fill=color)
-        
-        # Add border
-        draw.rectangle([0, 0, width-1, height-1], outline='#444', width=2)
-        
-        # Add preview text
-        try:
-            # Try to use a default font
-            font = ImageFont.load_default()
-        except:
-            font = None
-            
-        # Add icon and text
-        draw.text((width//2, height//2 - 20), "🖼️", font=font, anchor="mm", fill="#666")
-        draw.text((width//2, height//2 + 10), "Preview", font=font, anchor="mm", fill="#666")
-        draw.text((width//2, height//2 + 25), "Image", font=font, anchor="mm", fill="#666")
-        
-        return _pil_to_image_tensor(img)
-
-    def _save_image_as_preview(self, image_tensor: torch.Tensor, preview_file: str) -> None:
-        """Save the given image tensor as a preview image"""
-        os.makedirs(os.path.dirname(preview_file), exist_ok=True)
-        
-        # Create a backup of the original image if it exists
-        if os.path.exists(preview_file):
-            backup_file = f"{preview_file}.bak"
+    def run(self, preset_name="none", unique_id=None, extra_pnginfo=None):
+        # Load the selected preset if it exists
+        if preset_name and preset_name != "none":
             try:
-                shutil.copy2(preview_file, backup_file)
-            except Exception as e:
-                print(f"Warning: Could not create backup of preview image: {e}")
+                # Parse the preset_name format: "model_name/preset_name"
+                if "/" in preset_name:
+                    model_name, preset_id = preset_name.split("/", 1)
+                    
+                    # Find the actual model_id from the model_name
+                    from .storage_manager import _load_model_database
+                    db = _load_model_database()
+                    
+                    # Find the model_id that matches this model_name
+                    actual_model_id = None
+                    for mid, model_entry in db.get("models", {}).items():
+                        checkpoint_name = model_entry.get("checkpoint_name", "")
+                        if checkpoint_name:
+                            # Extract filename without path and extension
+                            clean_name = os.path.splitext(os.path.basename(checkpoint_name))[0]
+                            if clean_name == model_name:
+                                actual_model_id = mid
+                                break
+                    
+                    if actual_model_id is None:
+                        # Fallback: try to find by partial match
+                        for mid in os.listdir(os.path.join(PRESET_DIR, "models")):
+                            if model_name in mid or mid in model_name:
+                                actual_model_id = mid
+                                break
+                    
+                    if actual_model_id is None:
+                        print(f"Could not find model for: {model_name}")
+                        return ("No preset data",)
+                    
+                    preset_model_id = actual_model_id
+                else:
+                    print(f"Invalid preset format: {preset_name}")
+                    return ("No preset data",)
                 
-        # Save the new preview image
-        _image_tensor_to_pil(image_tensor).save(preview_file)
-        
-    def run(self, model, image=None, unique_id=None, extra_pnginfo=None):
-        # Get model identifier
-        model_id = _model_identifier(model, None)
-        
-        # Create model info text
-        model_name = getattr(model, "model_name", "Unknown Model")
-        model_info = f"Model: {model_name}\nID: {model_id}"
-        
-        # Handle preview image
-        preview_tensor = None
-        
-        if image is not None and image.shape[0] > 0:
-            # Use provided image as preview
-            preview_tensor = image
+                # Import storage manager functions
+                from .storage_manager import get_preset
+                preset_data = get_preset(preset_model_id, preset_id)
+                
+                print(f"Loaded preset '{preset_id}' for model '{model_name}'")
+                print(f"Preset data: {preset_data}")
+                
+                # Return preset data as string
+                import json
+                preset_json = json.dumps(preset_data, indent=2)
+                return (preset_json,)
+                    
+            except Exception as e:
+                print(f"Warning: Could not load preset '{preset_name}': {e}")
+                return ("Error loading preset",)
         else:
-            # Try to load existing preview
-            preview_file = _preview_path(model_id)
-            if os.path.exists(preview_file):
-                try:
-                    preview_tensor = _pil_to_image_tensor(Image.open(preview_file).convert("RGB"))
-                except Exception:
-                    preview_tensor = None
-            
-            # Fallback to default preview image if no preview available
-            if preview_tensor is None:
-                preview_tensor = self._create_default_preview()
-
-        return (model, preview_tensor, model_info)
+            print("No preset selected")
+            return ("No preset data",)
+    

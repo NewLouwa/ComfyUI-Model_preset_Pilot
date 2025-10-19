@@ -1,0 +1,45 @@
+{
+  "models": {
+    "model_ea08ab6cdf89": {
+      "id": "model_ea08ab6cdf89",
+      "checkpoint_name": null,
+      "first_seen": "2025-10-19T02:28:28.186529",
+      "last_seen": "2025-10-19T02:37:55.286158",
+      "usage_count": 2,
+      "model_info": {
+        "hash_based": true
+      }
+    },
+    "hardcoreHentai_ponyV11": {
+      "id": "hardcoreHentai_ponyV11",
+      "checkpoint_name": "Pony\\hardcoreHentai_ponyV11.safetensors",
+      "first_seen": "2025-10-19T02:47:55.484341",
+      "last_seen": "2025-10-19T02:48:27.591880",
+      "usage_count": 1,
+      "model_info": {
+        "user_selected": true
+      }
+    },
+    "v1-5-pruned-emaonly-fp16": {
+      "id": "v1-5-pruned-emaonly-fp16",
+      "checkpoint_name": "v1-5-pruned-emaonly-fp16.safetensors",
+      "first_seen": "2025-10-19T02:48:34.633665",
+      "last_seen": "2025-10-19T02:48:34.633665",
+      "usage_count": 0,
+      "model_info": {
+        "user_selected": true
+      }
+    },
+    "stoiqoNewrealityFLUXSD35_f1DAlphaTwo": {
+      "id": "stoiqoNewrealityFLUXSD35_f1DAlphaTwo",
+      "checkpoint_name": "Flux\\stoiqoNewrealityFLUXSD35_f1DAlphaTwo.safetensors",
+      "first_seen": "2025-10-19T03:06:54.429148",
+      "last_seen": "2025-10-19T03:09:18.579223",
+      "usage_count": 3,
+      "model_info": {
+        "user_selected": true
+      }
+    }
+  },
+  "last_updated": "2025-10-19T03:09:18.579223"
+}

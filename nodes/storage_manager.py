@@ -5,6 +5,7 @@ import os
 import json
 import hashlib
 import shutil
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -20,6 +21,30 @@ INDEX_FILE = os.path.join(BASE_PRESET_DIR, "index.json")
 # Ensure directories exist
 os.makedirs(BASE_PRESET_DIR, exist_ok=True)
 os.makedirs(MODELS_DIR, exist_ok=True)
+
+# Setup logging
+LOG_DIR = os.path.join(NODE_ROOT, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+def setup_logger():
+    logger = logging.getLogger('storage_manager')
+    logger.setLevel(logging.DEBUG)
+    
+    # Create file handler
+    log_file = os.path.join(LOG_DIR, f"storage_manager_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.DEBUG)
+    
+    # Create formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    
+    # Add handler to logger
+    logger.addHandler(file_handler)
+    
+    return logger
+
+logger = setup_logger()
 
 
 def _sanitize_filename(name: str) -> str:
@@ -140,13 +165,21 @@ def _save_model_metadata(model_id: str, metadata: Dict[str, Any]) -> None:
 
 def create_preset(model_id: str, preset_data: Dict[str, Any], preset_name: str = None) -> str:
     """Create a new preset for a model"""
+    logger.info(f"=== CREATE PRESET ===")
+    logger.info(f"Model ID: {model_id}")
+    logger.info(f"Preset name: {preset_name}")
+    logger.info(f"Preset data: {preset_data}")
+    
     # Generate preset ID
     preset_id = preset_name or f"preset_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     preset_id = _sanitize_filename(preset_id)
+    logger.info(f"Generated preset ID: {preset_id}")
     
     # Create preset directory
     preset_dir = _get_preset_directory(model_id, preset_id)
+    logger.info(f"Preset directory: {preset_dir}")
     os.makedirs(preset_dir, exist_ok=True)
+    logger.info(f"Created preset directory: {preset_dir}")
     
     # Create preset entry
     preset_entry = {
@@ -166,15 +199,28 @@ def create_preset(model_id: str, preset_data: Dict[str, Any], preset_name: str =
         "tags": preset_data.get("tags", [])
     }
     
+    logger.debug(f"Preset entry: {preset_entry}")
+    
     # Save individual preset file
     preset_file = _get_preset_file(model_id, preset_id)
+    logger.info(f"Saving preset file: {preset_file}")
     with open(preset_file, "w", encoding="utf-8") as f:
         json.dump(preset_entry, f, ensure_ascii=False, indent=2)
+    logger.info(f"Preset file saved successfully")
     
     # Update model metadata
     metadata = _load_model_metadata(model_id)
-    metadata["preset_count"] = len([d for d in os.listdir(_get_model_directory(model_id)) if os.path.isdir(os.path.join(_get_model_directory(model_id), d))])
+    model_dir = _get_model_directory(model_id)
+    logger.info(f"Model directory: {model_dir}")
+    
+    # Count existing presets
+    preset_count = 0
+    if os.path.exists(model_dir):
+        preset_count = len([d for d in os.listdir(model_dir) if os.path.isdir(os.path.join(model_dir, d))])
+    
+    metadata["preset_count"] = preset_count
     metadata["last_used"] = datetime.now().isoformat()
+    logger.info(f"Updated metadata - preset count: {preset_count}")
     _save_model_metadata(model_id, metadata)
     
     # Update main index
@@ -186,7 +232,9 @@ def create_preset(model_id: str, preset_data: Dict[str, Any], preset_name: str =
             "last_used": metadata.get("last_used"),
             "preset_count": metadata.get("preset_count", 0)
         }
+        logger.info(f"Added model to index: {model_id}")
     _save_index(index_data)
+    logger.info(f"Index updated successfully")
     
     return preset_id
 
@@ -286,3 +334,56 @@ def delete_preset(model_id: str, preset_id: str) -> bool:
         
         return True
     return False
+
+
+# Model database functions (moved from preset_creator_node.py)
+MODEL_DB_FILE = os.path.join(NODE_ROOT, "data", "model_database.json")
+
+def _load_model_database():
+    """Load the model database"""
+    if os.path.exists(MODEL_DB_FILE):
+        try:
+            with open(MODEL_DB_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load model database: {e}")
+    return {"models": {}, "last_updated": None}
+
+def _save_model_database(db):
+    """Save the model database"""
+    db["last_updated"] = datetime.now().isoformat()
+    try:
+        with open(MODEL_DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(db, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Could not save model database: {e}")
+
+def _update_model_database(model_id: str, checkpoint_name: str = None, model_info: dict = None):
+    """Update the model database"""
+    db = _load_model_database()
+    
+    if model_id not in db["models"]:
+        db["models"][model_id] = {
+            "id": model_id,
+            "checkpoint_name": checkpoint_name,
+            "first_seen": datetime.now().isoformat(),
+            "last_seen": datetime.now().isoformat(),
+            "usage_count": 0,
+            "model_info": model_info or {}
+        }
+    else:
+        # Update existing information
+        if checkpoint_name and not db["models"][model_id]["checkpoint_name"]:
+            db["models"][model_id]["checkpoint_name"] = checkpoint_name
+        db["models"][model_id]["last_seen"] = datetime.now().isoformat()
+        db["models"][model_id]["usage_count"] = db["models"][model_id].get("usage_count", 0) + 1
+    
+    _save_model_database(db)
+    logger.info(f"Updated model database: {model_id} -> {checkpoint_name}")
+
+def _get_model_name_from_database(model_id: str) -> str:
+    """Get the model name from the database"""
+    db = _load_model_database()
+    if model_id in db["models"]:
+        return db["models"][model_id].get("checkpoint_name", model_id)
+    return model_id
