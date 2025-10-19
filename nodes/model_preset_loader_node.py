@@ -229,8 +229,73 @@ def _get_preview_info(model_id: str) -> Dict[str, Any]:
                 info["dimensions"] = img.size
         except Exception:
             pass
-            
+                
     return info
+
+
+def _get_default_preview_image() -> torch.Tensor:
+    """Get a default preview image from the defaults directory"""
+    default_images = [
+        "NothingHere_Robot.png",
+        "NothingHere_Robot2.png", 
+        "NothingHere_Robot3.png",
+        "NothingHere_Robot4.png"
+    ]
+    
+    for img_name in default_images:
+        img_path = os.path.join(DEFAULTS_DIR, img_name)
+        if os.path.exists(img_path):
+            try:
+                img = Image.open(img_path).convert("RGB")
+                # Convert to tensor format expected by ComfyUI
+                arr = np.array(img).astype(np.float32) / 255.0
+                tensor = torch.from_numpy(arr).unsqueeze(0)  # Add batch dimension
+                return tensor
+            except Exception as e:
+                print(f"Warning: Could not load default image {img_name}: {e}")
+                continue
+    
+    # Fallback: create a simple colored image
+    return _create_fallback_image()
+
+
+def _create_fallback_image() -> torch.Tensor:
+    """Create a simple fallback image if no defaults are available"""
+    # Create a simple 512x512 image with a gradient
+    width, height = 512, 512
+    img_array = np.zeros((height, width, 3), dtype=np.float32)
+    
+    # Create a simple gradient
+    for y in range(height):
+        for x in range(width):
+            img_array[y, x] = [
+                x / width,  # Red gradient
+                y / height,  # Green gradient  
+                0.5  # Blue constant
+            ]
+    
+    tensor = torch.from_numpy(img_array).unsqueeze(0)  # Add batch dimension
+    return tensor
+
+
+def _load_preset_preview_image(model_id: str, preset_id: str) -> torch.Tensor:
+    """Load preview image for a specific preset, or return default if not found"""
+    from .storage_manager import _get_preset_preview_file
+    
+    preview_file = _get_preset_preview_file(model_id, preset_id)
+    
+    if os.path.exists(preview_file):
+        try:
+            img = Image.open(preview_file).convert("RGB")
+            # Convert to tensor format expected by ComfyUI
+            arr = np.array(img).astype(np.float32) / 255.0
+            tensor = torch.from_numpy(arr).unsqueeze(0)  # Add batch dimension
+            return tensor
+        except Exception as e:
+            print(f"Warning: Could not load preset preview image: {e}")
+    
+    # Return default image if preset preview not found
+    return _get_default_preview_image()
 
 
 def _load_default_templates() -> Dict[str, Any]:
@@ -517,9 +582,11 @@ class ModelPresetLoader:
 
     RETURN_TYPES = (
         "STRING",   # preset data as string
+        "IMAGE",    # preview image
     )
     RETURN_NAMES = (
-        "preset_data"
+        "preset_data",
+        "preview_image"
     )
     FUNCTION = "run"
     CATEGORY = "🤖 Model Preset Pilot"
@@ -557,12 +624,16 @@ class ModelPresetLoader:
                     
                     if actual_model_id is None:
                         print(f"Could not find model for: {model_name}")
-                        return ("No preset data",)
+                        # Return default image and error message
+                        default_image = _get_default_preview_image()
+                        return ("No preset data", default_image)
                     
                     preset_model_id = actual_model_id
                 else:
                     print(f"Invalid preset format: {preset_name}")
-                    return ("No preset data",)
+                    # Return default image and error message
+                    default_image = _get_default_preview_image()
+                    return ("No preset data", default_image)
                 
                 # Import storage manager functions
                 from .storage_manager import get_preset
@@ -571,15 +642,22 @@ class ModelPresetLoader:
                 print(f"Loaded preset '{preset_id}' for model '{model_name}'")
                 print(f"Preset data: {preset_data}")
                 
-                # Return preset data as string
+                # Load preview image for this preset
+                preview_image = _load_preset_preview_image(preset_model_id, preset_id)
+                
+                # Return preset data as string and preview image
                 import json
                 preset_json = json.dumps(preset_data, indent=2)
-                return (preset_json,)
-                    
+                return (preset_json, preview_image)
+                        
             except Exception as e:
                 print(f"Warning: Could not load preset '{preset_name}': {e}")
-                return ("Error loading preset",)
+                # Return default image and error message
+                default_image = _get_default_preview_image()
+                return ("Error loading preset", default_image)
         else:
             print("No preset selected")
-            return ("No preset data",)
+            # Return default image and no data message
+            default_image = _get_default_preview_image()
+            return ("No preset data", default_image)
     
