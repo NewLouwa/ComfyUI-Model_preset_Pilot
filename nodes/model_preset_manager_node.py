@@ -19,14 +19,30 @@ import nodes
 import folder_paths
 from .storage_manager import create_preset, get_preset, get_all_presets, save_preview_image, load_preview_image
 
-# Try to read available samplers/schedulers from Comfy's KSampler
-try:
-    from nodes import KSampler
-    SAMPLER_CHOICES = getattr(KSampler, "SAMPLERS", ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"])
-    SCHEDULER_CHOICES = getattr(KSampler, "SCHEDULERS", ["normal", "karras", "exponential", "sgm_uniform"])
-except Exception:
-    SAMPLER_CHOICES = ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
-    SCHEDULER_CHOICES = ["normal", "karras", "exponential", "sgm_uniform"]
+# Get available samplers/schedulers dynamically from ComfyUI
+def _get_sampler_choices():
+    """Get available samplers from ComfyUI"""
+    try:
+        from nodes import KSampler
+        if hasattr(KSampler, "SAMPLERS"):
+            return KSampler.SAMPLERS
+        else:
+            # Fallback to common samplers
+            return ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
+    except Exception:
+        return ["euler", "euler_ancestral", "lms", "heun", "dpmpp_2m", "dpmpp_sde"]
+
+def _get_scheduler_choices():
+    """Get available schedulers from ComfyUI"""
+    try:
+        from nodes import KSampler
+        if hasattr(KSampler, "SCHEDULERS"):
+            return KSampler.SCHEDULERS
+        else:
+            # Fallback to common schedulers
+            return ["normal", "karras", "exponential", "sgm_uniform"]
+    except Exception:
+        return ["normal", "karras", "exponential", "sgm_uniform"]
 
 # Data directory for default assets and templates
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
@@ -188,6 +204,10 @@ class ModelPresetManager:
         global _preset_choices
         _preset_choices = _get_all_preset_choices()
         
+        # Get dynamic sampler and scheduler choices
+        sampler_choices = _get_sampler_choices()
+        scheduler_choices = _get_scheduler_choices()
+        
         return {
             "required": {
                 "preset_name": (_preset_choices,),
@@ -196,8 +216,8 @@ class ModelPresetManager:
             "optional": {
                 "save_preset": ("BOOLEAN", {"default": False}),
                 "new_preset_name": ("STRING", {"default": "preset_XXX"}),
-                "sampler_name": (SAMPLER_CHOICES, {"default": "euler"}),
-                "scheduler": (SCHEDULER_CHOICES, {"default": "normal"}),
+                "sampler_name": (sampler_choices, {"default": "euler"}),
+                "scheduler": (scheduler_choices, {"default": "normal"}),
                 "steps": ("INT", {"default": 28, "min": 1, "max": 100}),
                 "cfg": ("FLOAT", {"default": 5.5, "min": 0.1, "max": 20.0}),
                 "clip_skip": ("INT", {"default": 0, "min": 0, "max": 12}),
