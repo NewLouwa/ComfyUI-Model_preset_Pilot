@@ -17,8 +17,6 @@ import numpy as np
 import comfy.utils
 import nodes
 import folder_paths
-import server
-from server import PromptServer
 from .storage_manager import create_preset, get_preset, get_all_presets, save_preview_image, load_preview_image
 
 # Try to read available samplers/schedulers from Comfy's KSampler
@@ -67,8 +65,8 @@ def api_load_preview_image(json_data):
     except Exception as e:
         return {"error": str(e)}
 
-# Register the API endpoint
-server.PromptServer.instance.app.post("/model_preset_pilot/upload_preview")(api_load_preview_image)
+# API endpoint registration removed for compatibility
+# server.PromptServer.instance.app.post("/model_preset_pilot/upload_preview")(api_load_preview_image)
 
 def _pil_to_image_tensor(pil: Image.Image) -> torch.Tensor:
     """Convert PIL Image to ComfyUI tensor format [1,H,W,C]"""
