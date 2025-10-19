@@ -196,8 +196,8 @@ class ModelPresetManager:
             "optional": {
                 "save_preset": ("BOOLEAN", {"default": False}),
                 "new_preset_name": ("STRING", {"default": "preset_XXX"}),
-                "sampler_name": ("STRING", {"default": "euler"}),
-                "scheduler": ("STRING", {"default": "normal"}),
+                "sampler_name": (SAMPLER_CHOICES, {"default": "euler"}),
+                "scheduler": (SCHEDULER_CHOICES, {"default": "normal"}),
                 "steps": ("INT", {"default": 28, "min": 1, "max": 100}),
                 "cfg": ("FLOAT", {"default": 5.5, "min": 0.1, "max": 20.0}),
                 "clip_skip": ("INT", {"default": 0, "min": 0, "max": 12}),
