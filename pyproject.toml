@@ -1,0 +1,37 @@
+[project]
+name = "model_preset_pilot"
+description = "A ComfyUI custom node module for managing model presets and configurations. This module automatically detects the model, loads/saves presets (sampler, scheduler, steps, CFG, clip-skip, seed, resolution), and generates/caches preview images per model."
+version = "1.0.0"
+license = {file = "LICENSE"} 
+# classifiers = [
+#     # For OS-independent nodes (works on all operating systems)
+#     "Operating System :: OS Independent",
+#
+#     # OR for OS-specific nodes, specify the supported systems:
+#     "Operating System :: Microsoft :: Windows",  # Windows specific
+#     "Operating System :: POSIX :: Linux",  # Linux specific
+#     "Operating System :: MacOS",  # macOS specific
+#
+#     # GPU Accelerator support. Pick the ones that are supported by your extension.
+#     "Environment :: GPU :: NVIDIA CUDA",    # NVIDIA CUDA support
+#     "Environment :: GPU :: AMD ROCm",       # AMD ROCm support
+#     "Environment :: GPU :: Intel Arc",      # Intel Arc support
+#     "Environment :: NPU :: Huawei Ascend",  # Huawei Ascend support
+#     "Environment :: GPU :: Apple Metal",    # Apple Metal support
+# ]
+
+dependencies = ["# ComfyUI Model Preset Pilot Requirements", "# Dependencies for the Model Preset Pilot module", "torch>=1.9.0", "pillow>=8.3.0", "numpy>=1.21.0"]
+
+[project.urls]
+Repository = "https://github.com/NewLouwa/ComfyUI-Model_preset_Pilot"
+#  Used by Comfy Registry https://registry.comfy.org
+Documentation = "https://github.com/NewLouwa/ComfyUI-Model_preset_Pilot/wiki"
+"Bug Tracker" = "https://github.com/NewLouwa/ComfyUI-Model_preset_Pilot/issues"
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-Model_preset_Pilot"
+Icon = ""
+includes = [] 
+# "requires-comfyui" = ">=1.0.0"  # ComfyUI version compatibility
+
